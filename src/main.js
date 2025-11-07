@@ -1,30 +1,40 @@
-// src/main.js - Processo Principal do Electron
+// src/main.js - Processo Principal do Electron (CORRIGIDO)
 
 const { app, BrowserWindow, screen, ipcMain } = require('electron');
 const path = require('path');
-const { initDatabase, getGameState, createPet, updatePet, getPetById } = require('./database/db');
+const { initDatabase, getGameState, createPet, updatePet, getPetById, updateGameState } = require('./database/db');
 const { loadPokemonData } = require('./utils/pokemonLoader');
 const { calculateXpGain, levelUp } = require('./utils/experienceSystem');
 
 let starterWindow = null;
-let petWindows = new Map(); // Map de petId -> BrowserWindow
+let petWindows = new Map();
 let gameState = null;
 let xpInterval = null;
 
 // Inicializa o banco de dados
 async function initialize() {
-    await initDatabase();
-    gameState = await getGameState();
-    
-    if (!gameState.hasChosenStarter) {
-        createStarterWindow();
-    } else {
-        // Carrega o pet inicial e cria a janela
-        const starterPet = await getPetById(gameState.starterPetId);
-        if (starterPet) {
-            createPetWindow(starterPet);
-            startXpSystem();
+    try {
+        await initDatabase();
+        gameState = await getGameState();
+        
+        console.log('Estado do jogo:', gameState);
+        
+        if (!gameState.hasChosenStarter) {
+            console.log('Criando janela de seleção...');
+            createStarterWindow();
+        } else {
+            console.log('Carregando pet inicial...');
+            const starterPet = await getPetById(gameState.starterPetId);
+            if (starterPet) {
+                await createPetWindow(starterPet);
+                startXpSystem();
+            } else {
+                console.error('Pet inicial não encontrado!');
+                createStarterWindow();
+            }
         }
+    } catch (error) {
+        console.error('Erro na inicialização:', error);
     }
 }
 
@@ -48,10 +58,16 @@ function createStarterWindow() {
 
     starterWindow.loadFile(path.join(__dirname, 'windows/starter.html'));
     starterWindow.setMenu(null);
+    
+    starterWindow.webContents.openDevTools(); // Para debug
+    
+    starterWindow.on('closed', () => {
+        starterWindow = null;
+    });
 }
 
 // Cria janela do pet
-function createPetWindow(petData) {
+async function createPetWindow(petData) {
     const { width, height } = screen.getPrimaryDisplay().workAreaSize;
     
     const petWindow = new BrowserWindow({
@@ -72,21 +88,18 @@ function createPetWindow(petData) {
         }
     });
 
-    petWindow.loadFile(path.join(__dirname, 'windows/pet.html'));
+    await petWindow.loadFile(path.join(__dirname, 'windows/pet.html'));
+    
+    // Pequeno delay para garantir que a página carregou
+    setTimeout(() => {
+        petWindow.webContents.send('pet-data', petData);
+        console.log('Dados do pet enviados:', petData);
+    }, 500);
+    
     petWindow.setIgnoreMouseEvents(true, { forward: true });
     petWindow.setMenu(null);
-
-    // Envia dados do pet quando a página carregar
-    petWindow.webContents.on('did-finish-load', () => {
-        petWindow.webContents.send('pet-data', petData);
-    });
-
-    // ESC para fechar
-    petWindow.webContents.on('before-input-event', (event, input) => {
-        if (input.type === 'keyDown' && input.key === 'Escape') {
-            app.quit();
-        }
-    });
+    
+    petWindow.webContents.openDevTools(); // Para debug
 
     petWindows.set(petData.id, petWindow);
 
@@ -99,34 +112,43 @@ function createPetWindow(petData) {
 
 // Sistema de ganho de XP passivo
 function startXpSystem() {
-    // Ganha XP a cada 10 segundos
+    console.log('Sistema de XP iniciado');
+    
     xpInterval = setInterval(async () => {
+        console.log('Ganho de XP passivo...');
+        
         for (const [petId, window] of petWindows) {
-            const pet = await getPetById(petId);
-            if (pet && pet.isActive) {
-                const xpGain = calculateXpGain(pet.level);
-                const newXp = pet.experience + xpGain;
-                
-                // Verifica se subiu de nível
-                const levelUpResult = levelUp(pet.level, newXp);
-                
-                const updatedPet = await updatePet(petId, {
-                    experience: levelUpResult.experience,
-                    level: levelUpResult.level,
-                    maxHp: levelUpResult.level > pet.level ? pet.maxHp + 5 : pet.maxHp,
-                    attack: levelUpResult.level > pet.level ? pet.attack + 2 : pet.attack,
-                    lastXpGain: new Date()
-                });
-
-                // Notifica a janela do pet
-                window.webContents.send('pet-update', updatedPet);
-                
-                if (levelUpResult.leveledUp) {
-                    window.webContents.send('level-up', {
-                        newLevel: levelUpResult.level,
-                        petId: petId
+            try {
+                const pet = await getPetById(petId);
+                if (pet && pet.isActive) {
+                    const xpGain = calculateXpGain(pet.level);
+                    const newXp = pet.experience + xpGain;
+                    
+                    console.log(`Pet ${pet.pokemonId} ganhou ${xpGain} XP (Total: ${newXp})`);
+                    
+                    const levelUpResult = levelUp(pet.level, newXp);
+                    
+                    const updatedPet = await updatePet(petId, {
+                        experience: levelUpResult.experience,
+                        level: levelUpResult.level,
+                        maxHp: levelUpResult.level > pet.level ? pet.maxHp + 5 : pet.maxHp,
+                        attack: levelUpResult.level > pet.level ? pet.attack + 2 : pet.attack,
+                        currentHp: levelUpResult.level > pet.level ? pet.currentHp + 5 : pet.currentHp,
+                        lastXpGain: new Date()
                     });
+
+                    window.webContents.send('pet-update', updatedPet);
+                    
+                    if (levelUpResult.leveledUp) {
+                        console.log(`LEVEL UP! Novo nível: ${levelUpResult.level}`);
+                        window.webContents.send('level-up', {
+                            newLevel: levelUpResult.level,
+                            petId: petId
+                        });
+                    }
                 }
+            } catch (error) {
+                console.error('Erro ao processar XP:', error);
             }
         }
     }, 10000); // 10 segundos
@@ -134,10 +156,12 @@ function startXpSystem() {
 
 // ============ IPC HANDLERS ============
 
-// Escolha do inicial
 ipcMain.handle('choose-starter', async (event, pokemonId) => {
     try {
+        console.log('Escolhendo inicial:', pokemonId);
+        
         const pokemonData = await loadPokemonData(pokemonId);
+        console.log('Dados do Pokémon:', pokemonData);
         
         const newPet = await createPet({
             pokemonId: pokemonId,
@@ -149,18 +173,21 @@ ipcMain.handle('choose-starter', async (event, pokemonId) => {
             speed: pokemonData.baseStats.speed
         });
 
-        // Atualiza estado do jogo
+        console.log('Pet criado:', newPet);
+
         gameState = await updateGameState({
             hasChosenStarter: true,
             starterPetId: newPet.id
         });
+
+        console.log('Estado atualizado:', gameState);
 
         if (starterWindow) {
             starterWindow.close();
             starterWindow = null;
         }
 
-        createPetWindow(newPet);
+        await createPetWindow(newPet);
         startXpSystem();
 
         return { success: true, pet: newPet };
@@ -170,16 +197,26 @@ ipcMain.handle('choose-starter', async (event, pokemonId) => {
     }
 });
 
-// Carrega lista de iniciais disponíveis
 ipcMain.handle('get-starters', async () => {
-    const starters = ['pikachu', 'charmander', 'squirtle', 'bulbasaur', 'dragonite'];
-    const starterData = await Promise.all(
-        starters.map(id => loadPokemonData(id))
-    );
-    return starterData;
+    try {
+        const starters = ['pikachu', 'charmander', 'squirtle', 'bulbasaur', 'dragonite'];
+        const starterData = await Promise.all(
+            starters.map(async id => {
+                try {
+                    return await loadPokemonData(id);
+                } catch (error) {
+                    console.error(`Erro ao carregar ${id}:`, error);
+                    return null;
+                }
+            })
+        );
+        return starterData.filter(s => s !== null);
+    } catch (error) {
+        console.error('Erro ao carregar starters:', error);
+        return [];
+    }
 });
 
-// Move a janela do pet
 ipcMain.on('move-window', async (event, data) => {
     const { petId, x, y } = data;
     const window = petWindows.get(petId);
@@ -193,29 +230,20 @@ ipcMain.on('move-window', async (event, data) => {
             height: 120
         });
 
-        // Atualiza posição no banco
         await updatePet(petId, { positionX: x, positionY: y });
     }
 });
 
-// Mostra/esconde card de informações
-ipcMain.on('toggle-card', (event, data) => {
-    const { petId, show } = data;
-    const window = petWindows.get(petId);
-    
-    if (window) {
-        window.webContents.send('toggle-card', show);
-    }
-});
-
-// Obtém dados atualizados do pet
 ipcMain.handle('get-pet-data', async (event, petId) => {
     return await getPetById(petId);
 });
 
 // ============ APP LIFECYCLE ============
 
-app.whenReady().then(initialize);
+app.whenReady().then(() => {
+    console.log('App pronto, inicializando...');
+    initialize();
+});
 
 app.on('window-all-closed', () => {
     if (xpInterval) clearInterval(xpInterval);
@@ -228,19 +256,25 @@ app.on('activate', () => {
     }
 });
 
-// Salva estado antes de fechar
 app.on('before-quit', async () => {
     if (xpInterval) clearInterval(xpInterval);
     
-    // Salva posições dos pets
     for (const [petId, window] of petWindows) {
-        const bounds = window.getBounds();
-        await updatePet(petId, {
-            positionX: bounds.x,
-            positionY: bounds.y
-        });
+        if (!window.isDestroyed()) {
+            const bounds = window.getBounds();
+            await updatePet(petId, {
+                positionX: bounds.x,
+                positionY: bounds.y
+            });
+        }
     }
 });
 
-// Importa funções do database que faltam
-const { updateGameState } = require('./database/db');
+// Tratamento de erros não capturados
+process.on('uncaughtException', (error) => {
+    console.error('Erro não capturado:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Promise rejeitada:', reason);
+});

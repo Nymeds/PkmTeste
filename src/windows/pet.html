@@ -5,95 +5,268 @@
     <title>Pokémon Pet</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
         body {
             margin: 0;
             background: transparent;
             overflow: hidden;
+            width: 120px;
+            height: 120px;
         }
+        
+        #pet-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        
         #pet-img {
-            width: 100px;
-            height: 100px;
+            width: 80px;
+            height: 80px;
+            position: absolute;
+            bottom: 10px;
+            left: 20px;
             pointer-events: auto;
             cursor: pointer;
             transition: transform 0.2s;
+            image-rendering: pixelated;
+            animation: bounce 2s ease-in-out infinite;
         }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+        }
+        
         #pet-img:hover {
-            transform: scale(1.08);
+            transform: scale(1.1) translateY(-5px);
+            animation: none;
         }
+        
         #pet-card {
-            position: absolute;
-            left: 110px;
+            position: fixed;
+            left: 130px;
             top: 0;
-            z-index: 10;
+            z-index: 10000;
             display: none;
+            pointer-events: none;
+        }
+        
+        .card-visible {
+            display: block !important;
         }
     </style>
 </head>
 <body>
-    <img id="pet-img" src="" alt="Pet">
-    <div id="pet-card"></div>
-    <script type="module">
-        import PetCard from '../components/PetCard.jsx';
+    <div id="pet-container">
+        <img id="pet-img" src="" alt="Pet">
+    </div>
+    
+    <!-- Card de Informações -->
+    <div id="pet-card">
+        <div class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-lg shadow-2xl border-2 border-slate-600 p-4 w-64">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h3 id="card-name" class="text-white font-bold text-lg"></h3>
+                    <p id="card-species" class="text-gray-400 text-xs"></p>
+                </div>
+                <div class="bg-yellow-500 text-black font-bold rounded-full w-12 h-12 flex items-center justify-center text-lg shadow-lg">
+                    <span id="card-level">1</span>
+                </div>
+            </div>
 
+            <div id="card-types" class="flex gap-2 mb-3"></div>
+
+            <div class="mb-3">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-gray-300 text-sm font-semibold">HP</span>
+                    <span id="card-hp" class="text-gray-300 text-sm font-mono">0/0</span>
+                </div>
+                <div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden shadow-inner">
+                    <div id="card-hp-bar" class="bg-green-500 h-full transition-all duration-500" style="width: 100%"></div>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-gray-300 text-sm font-semibold">EXP</span>
+                    <span id="card-xp" class="text-gray-300 text-sm font-mono">0%</span>
+                </div>
+                <div class="w-full bg-gray-700 rounded-full h-2 overflow-hidden shadow-inner">
+                    <div id="card-xp-bar" class="bg-gradient-to-r from-blue-500 to-cyan-400 h-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 mb-2">
+                <div class="bg-slate-700 rounded-lg p-2">
+                    <div class="text-gray-400 text-xs mb-1">ATK</div>
+                    <div id="card-atk" class="text-white font-bold text-lg">0</div>
+                </div>
+                <div class="bg-slate-700 rounded-lg p-2">
+                    <div class="text-gray-400 text-xs mb-1">DEF</div>
+                    <div id="card-def" class="text-white font-bold text-lg">0</div>
+                </div>
+                <div class="bg-slate-700 rounded-lg p-2">
+                    <div class="text-gray-400 text-xs mb-1">SPD</div>
+                    <div id="card-spd" class="text-white font-bold text-lg">0</div>
+                </div>
+                <div class="bg-slate-700 rounded-lg p-2">
+                    <div class="text-gray-400 text-xs mb-1">CP</div>
+                    <div id="card-cp" class="text-yellow-400 font-bold text-lg">0</div>
+                </div>
+            </div>
+
+            <div id="card-desc" class="text-gray-400 text-xs italic mt-3 pt-3 border-t border-slate-700"></div>
+        </div>
+    </div>
+
+    <script>
         let petData = null;
         let pokemonData = null;
         let cardVisible = false;
 
-        // Recebe dados do pet
-        window.electronAPI.onPetData(async (data) => {
-            petData = data;
-            await loadPokemonData();
-            renderPet();
-        });
+        const typeColors = {
+            electric: 'bg-yellow-400',
+            fire: 'bg-red-500',
+            water: 'bg-blue-500',
+            grass: 'bg-green-500',
+            poison: 'bg-purple-500',
+            dragon: 'bg-indigo-600',
+            flying: 'bg-cyan-400',
+            normal: 'bg-gray-400'
+        };
 
-        window.electronAPI.onPetUpdate(async (data) => {
-            petData = data;
-            renderPet();
-        });
-
-        window.electronAPI.onToggleCard((show) => {
-            cardVisible = show;
-            renderCard();
-        });
-
-        async function loadPokemonData() {
-            // Busca dados do Pokémon
-            const res = await window.electronAPI.getStarters();
-            pokemonData = res.find(p => p.id === petData.pokemonId);
+        // Calcula progresso de XP
+        function calculateXpProgress() {
+            if (!petData) return 0;
+            const currentLevelXp = Math.pow(petData.level, 3) * 0.75;
+            const nextLevelXp = Math.pow(petData.level + 1, 3) * 0.75;
+            const xpIntoLevel = petData.experience - currentLevelXp;
+            const xpNeeded = nextLevelXp - currentLevelXp;
+            return Math.min(100, Math.max(0, (xpIntoLevel / xpNeeded) * 100));
         }
 
-        function renderPet() {
-            const img = document.getElementById('pet-img');
-            img.src = pokemonData.imageUrl;
-            img.alt = pokemonData.name;
-        }
+        // Atualiza o card
+        function updateCard() {
+            if (!petData || !pokemonData) return;
 
-        function renderCard() {
-            const card = document.getElementById('pet-card');
-            if (cardVisible && petData && pokemonData) {
-                // Renderiza o card usando React (simplificado)
-                card.style.display = 'block';
-                card.innerHTML = `
-                    <div class="bg-slate-900 text-white rounded-lg p-4 shadow-xl w-64">
-                        <h3 class="font-bold text-lg">${petData.nickname || pokemonData.name}</h3>
-                        <p>Nível: ${petData.level}</p>
-                        <p>XP: ${petData.experience}</p>
-                        <p>HP: ${petData.currentHp}/${petData.maxHp}</p>
-                        <p>ATK: ${petData.attack}</p>
-                    </div>
-                `;
+            document.getElementById('card-name').textContent = petData.nickname || pokemonData.name;
+            document.getElementById('card-species').textContent = pokemonData.name;
+            document.getElementById('card-level').textContent = petData.level;
+            
+            // HP
+            const hpPercent = (petData.currentHp / petData.maxHp) * 100;
+            document.getElementById('card-hp').textContent = `${petData.currentHp}/${petData.maxHp}`;
+            document.getElementById('card-hp-bar').style.width = `${hpPercent}%`;
+            
+            // Cor da barra HP
+            const hpBar = document.getElementById('card-hp-bar');
+            if (hpPercent > 50) {
+                hpBar.className = 'bg-green-500 h-full transition-all duration-500';
+            } else if (hpPercent > 25) {
+                hpBar.className = 'bg-yellow-500 h-full transition-all duration-500';
             } else {
-                card.style.display = 'none';
+                hpBar.className = 'bg-red-500 h-full transition-all duration-500';
+            }
+            
+            // XP
+            const xpPercent = calculateXpProgress();
+            document.getElementById('card-xp').textContent = `${Math.floor(xpPercent)}%`;
+            document.getElementById('card-xp-bar').style.width = `${xpPercent}%`;
+            
+            // Tipos
+            const typesContainer = document.getElementById('card-types');
+            typesContainer.innerHTML = '';
+            pokemonData.type.forEach(type => {
+                const typeSpan = document.createElement('span');
+                typeSpan.className = `${typeColors[type] || 'bg-gray-400'} text-white text-xs font-semibold px-3 py-1 rounded-full uppercase shadow`;
+                typeSpan.textContent = type;
+                typesContainer.appendChild(typeSpan);
+            });
+            
+            // Stats
+            document.getElementById('card-atk').textContent = petData.attack;
+            document.getElementById('card-def').textContent = petData.defense;
+            document.getElementById('card-spd').textContent = petData.speed;
+            
+            const cp = Math.floor((petData.maxHp + petData.attack + petData.defense + petData.speed) * petData.level / 4);
+            document.getElementById('card-cp').textContent = cp;
+            
+            // Descrição
+            document.getElementById('card-desc').textContent = pokemonData.description || '';
+        }
+
+        // Mostra/esconde card
+        function toggleCard(show) {
+            cardVisible = show;
+            const card = document.getElementById('pet-card');
+            if (show) {
+                card.classList.add('card-visible');
+            } else {
+                card.classList.remove('card-visible');
             }
         }
 
-        // Hover para mostrar/esconder card
-        document.getElementById('pet-img').addEventListener('mouseenter', () => {
-            window.electronAPI.toggleCard({ petId: petData.id, show: true });
+        // Carrega dados do Pokémon
+        async function loadPokemonData() {
+            try {
+                const starters = await window.electronAPI.getStarters();
+                pokemonData = starters.find(p => p.id === petData.pokemonId);
+                
+                if (pokemonData) {
+                    renderPet();
+                    updateCard();
+                } else {
+                    console.error('Pokémon não encontrado:', petData.pokemonId);
+                }
+            } catch (error) {
+                console.error('Erro ao carregar dados do Pokémon:', error);
+            }
+        }
+
+        // Renderiza a imagem do pet
+        function renderPet() {
+            const img = document.getElementById('pet-img');
+            if (pokemonData && pokemonData.imageUrl) {
+                img.src = pokemonData.imageUrl;
+                img.alt = pokemonData.name;
+            }
+        }
+
+        // Event Listeners
+        const petImg = document.getElementById('pet-img');
+        petImg.addEventListener('mouseenter', () => toggleCard(true));
+        petImg.addEventListener('mouseleave', () => toggleCard(false));
+
+        // Recebe dados iniciais do pet
+        window.electronAPI.onPetData((data) => {
+            console.log('Dados do pet recebidos:', data);
+            petData = data;
+            loadPokemonData();
         });
-        document.getElementById('pet-img').addEventListener('mouseleave', () => {
-            window.electronAPI.toggleCard({ petId: petData.id, show: false });
+
+        // Recebe atualizações do pet
+        window.electronAPI.onPetUpdate((data) => {
+            console.log('Pet atualizado:', data);
+            petData = data;
+            updateCard();
         });
+
+        // Recebe notificação de level up
+        window.electronAPI.onLevelUp((data) => {
+            console.log('Level Up!', data);
+            // Adicionar animação de level up aqui
+            if (cardVisible) {
+                updateCard();
+            }
+        });
+
+        console.log('Pet window carregada');
     </script>
 </body>
 </html>
