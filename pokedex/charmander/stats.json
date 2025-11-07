@@ -1,0 +1,17 @@
+{
+  "name": "Charmander",
+  "type": ["Fire"],
+  "baseStats": {
+    "hp": 39,
+    "attack": 52,
+    "defense": 43,
+    "speed": 65
+  },
+  "xpPerLevel": 100,
+  "hpGrowth": 6,
+  "attackGrowth": 4,
+  "defenseGrowth": 2,
+  "speedGrowth": 3,
+  "color": "#F08030",
+  "description": "A chama em sua cauda indica seu estado vital. Se estiver fraca, o Charmander está em perigo. Proteja-o bem!"
+}

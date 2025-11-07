@@ -1,21 +1,49 @@
 {
   "name": "pokemon-desktop-pet",
-  "version": "1.0.0",
-  "description": "Um Pokémon que fica andando na barra inferior do Windows",
-  "main": "src/main.js",
+  "version": "2.0.0",
+  "description": "Pokémon Desktop Pets com sistema de níveis e experiência",
+  "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --inspect"
+    "dev": "electron . --inspect",
+    "build": "webpack --mode production",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "prisma:setup": "prisma migrate dev --name init && prisma generate",
+    "postinstall": "prisma generate",
+    "setup": "npm install && npm run prisma:setup"
   },
   "keywords": [
     "electron",
     "desktop-pet",
     "pokemon",
-    "mascot"
+    "mascot",
+    "react",
+    "prisma",
+    "tailwind"
   ],
   "author": "Seu Nome",
   "license": "MIT",
+  "dependencies": {
+    "@prisma/client": "^5.20.0",
+    "electron-store": "^8.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
   "devDependencies": {
-    "electron": "^31.7.7"
+    "@babel/core": "^7.25.0",
+    "@babel/preset-react": "^7.24.0",
+    "autoprefixer": "^10.4.20",
+    "babel-loader": "^9.2.1",
+    "css-loader": "^6.11.0",
+    "electron": "^31.7.7",
+    "postcss": "^8.4.47",
+    "postcss-loader": "^7.3.4",
+    "prisma": "^5.20.0",
+    "style-loader": "^3.3.4",
+    "tailwindcss": "^3.4.14",
+    "webpack": "^5.95.0",
+    "webpack-cli": "^5.1.4"
   }
 }

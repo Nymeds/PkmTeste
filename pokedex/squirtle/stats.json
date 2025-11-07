@@ -1,0 +1,17 @@
+{
+  "name": "Squirtle",
+  "type": ["Water"],
+  "baseStats": {
+    "hp": 44,
+    "attack": 48,
+    "defense": 65,
+    "speed": 43
+  },
+  "xpPerLevel": 100,
+  "hpGrowth": 7,
+  "attackGrowth": 2,
+  "defenseGrowth": 4,
+  "speedGrowth": 2,
+  "color": "#6890F0",
+  "description": "Squirtle esconde-se dentro de sua concha quando está em perigo. Pode disparar jatos d'água com grande precisão."
+}

@@ -1,0 +1,49 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Pokemon {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  isStarter   Boolean  @default(false)
+  level       Int      @default(1)
+  xp          Int      @default(0)
+  hp          Int
+  maxHp       Int
+  attack      Int
+  defense     Int
+  speed       Int
+  positionX   Float    @default(0)
+  positionY   Float    @default(0)
+  isActive    Boolean  @default(false)
+  lastSeen    DateTime @default(now())
+  createdAt   DateTime @default(now())
+  
+  encounters  Encounter[]
+}
+
+model Encounter {
+  id          Int      @id @default(autoincrement())
+  pokemonId   Int
+  pokemon     Pokemon  @relation(fields: [pokemonId], references: [id], onDelete: Cascade)
+  timestamp   DateTime @default(now())
+  duration    Int      // em segundos
+  xpGained    Int
+}
+
+model GameState {
+  id              Int      @id @default(autoincrement())
+  starterPokemon  String?
+  totalPlayTime   Int      @default(0) // em segundos
+  totalXpEarned   Int      @default(0)
+  pokemonCaught   Int      @default(0)
+  lastPlayed      DateTime @default(now())
+}
