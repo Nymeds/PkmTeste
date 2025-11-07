@@ -24,6 +24,8 @@ const pokemonName = pokemonNameArg ? decodeURIComponent(pokemonNameArg.split('='
 const isStarter = isStarterArg === "--starter=true";
 const id = petIdArg ? Number(petIdArg.split('=')[1]) : Math.floor(Math.random() * 100000);
 
+console.log(`[Pet ${id}] Inicializado: ${pokemonName}, Starter: ${isStarter}`);
+
 // --- Pokémon Data ---
 let pokemonData = {
     name: pokemonName,
@@ -60,7 +62,10 @@ let idleDuration = getRandomDuration(1000, 3000);
 let stateTimer = 0;
 
 // --- Captura ---
-let isCapturable = true;
+let isCapturable = !isStarter; // Apenas pokémons não-starter podem ser capturados
+let isBeingCaptured = false;
+
+console.log(`[Pet ${id}] Capturável: ${isCapturable}`);
 
 // ----------------- FUNÇÕES AUXILIARES -----------------
 function createFallbackImage() {
@@ -111,6 +116,8 @@ function maybeChangeDirection() {
 }
 
 function updateStats() {
+    if (!isStarter) return; // Apenas starters ganham XP passivo
+    
     pokemonData.xp += 1;
     if (pokemonData.xp >= pokemonData.level * 100) {
         pokemonData.xp = 0;
@@ -124,19 +131,50 @@ function updateStats() {
 }
 
 // ----------------- CAPTURA -----------------
-hoverZone.addEventListener('click', () => {
-    console.log('Pet clicado!');
-    if (!isCapturable) return;
-    isCapturable = false;
+hoverZone.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    console.log(`[Pet ${id}] Clique detectado! Capturável: ${isCapturable}, Sendo capturado: ${isBeingCaptured}`);
+    
+    if (!isCapturable || isBeingCaptured) {
+        console.log(`[Pet ${id}] Captura bloqueada`);
+        return;
+    }
+    
+    isBeingCaptured = true;
+    console.log(`[Pet ${id}] Iniciando animação de captura`);
     throwPokeball();
 });
 
-// ----------------- HOVER -----------------
-hoverZone.addEventListener('mouseenter', () => ipcRenderer.send('show-card', id));
-hoverZone.addEventListener('mouseleave', () => ipcRenderer.send('hide-card', id));
+// Adiciona feedback visual no hover para pokémons capturáveis
+if (isCapturable) {
+    hoverZone.style.cursor = 'pointer';
+    
+    hoverZone.addEventListener('mouseenter', () => {
+        hoverZone.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+        ipcRenderer.send('show-card', id);
+    });
+    
+    hoverZone.addEventListener('mouseleave', () => {
+        hoverZone.style.backgroundColor = 'transparent';
+        ipcRenderer.send('hide-card', id);
+    });
+} else {
+    // Apenas mostra card para starters
+    hoverZone.addEventListener('mouseenter', () => ipcRenderer.send('show-card', id));
+    hoverZone.addEventListener('mouseleave', () => ipcRenderer.send('hide-card', id));
+}
 
 // ----------------- FUNÇÕES DE LANÇAMENTO -----------------
 function throwPokeball() {
+    console.log(`[Pet ${id}] Lançando Pokébola`);
+    
+    // Para o movimento do pokémon
+    walkState = 'idle';
+    isJumping = false;
+    jumpHeight = 0;
+    
     const startX = canvas.width / 2;
     const startY = canvas.height;
     const targetX = canvas.width / 2;
@@ -150,23 +188,41 @@ function throwPokeball() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         drawPokemon();
 
-        const currentX = startX + (targetX - startX) * (t / duration);
-        const currentY = startY + (targetY - startY) * (t / duration) - 50 * Math.sin((t / duration) * Math.PI);
+        const progress = t / duration;
+        const currentX = startX + (targetX - startX) * progress;
+        const currentY = startY + (targetY - startY) * progress - 50 * Math.sin(progress * Math.PI);
+        
         ctx.drawImage(pokeballImg, currentX - 15, currentY - 15, 30, 30);
 
         t++;
-        if (t <= duration) requestAnimationFrame(animateThrow);
-        else shakePokeball(shakeCount, () => {
-            const caught = Math.random() < 0.7;
-            if (caught) ipcRenderer.send('capture-success', id, pokemonData);
-            else isCapturable = true;
-        });
+        if (t <= duration) {
+            requestAnimationFrame(animateThrow);
+        } else {
+            console.log(`[Pet ${id}] Pokébola atingiu o alvo, iniciando tremores`);
+            shakePokeball(shakeCount, () => {
+                const captureChance = 0.7; // 70% de chance
+                const caught = Math.random() < captureChance;
+                
+                console.log(`[Pet ${id}] Resultado da captura: ${caught ? 'SUCESSO' : 'FALHOU'}`);
+                
+                if (caught) {
+                    console.log(`[Pet ${id}] Enviando evento de captura para main`);
+                    ipcRenderer.send('capture-success', id, pokemonData);
+                } else {
+                    console.log(`[Pet ${id}] Pokémon escapou, restaurando capturabilidade`);
+                    isBeingCaptured = false;
+                    walkState = 'walking';
+                }
+            });
+        }
     }
 
     animateThrow();
 }
 
 function shakePokeball(times, callback) {
+    console.log(`[Pet ${id}] Tremores restantes: ${times}`);
+    
     let shakeT = 0;
     const shakeDuration = 20;
 
@@ -178,9 +234,15 @@ function shakePokeball(times, callback) {
         ctx.drawImage(pokeballImg, canvas.width / 2 - 15 + shakeOffset, canvas.height / 2 - 15, 30, 30);
 
         shakeT++;
-        if (shakeT <= shakeDuration) requestAnimationFrame(animateShake);
-        else if (times > 1) shakePokeball(times - 1, callback);
-        else callback();
+        if (shakeT <= shakeDuration) {
+            requestAnimationFrame(animateShake);
+        } else {
+            if (times > 1) {
+                shakePokeball(times - 1, callback);
+            } else {
+                callback();
+            }
+        }
     }
 
     animateShake();
@@ -198,43 +260,58 @@ function drawPokemon() {
     ctx.scale(direction === 1 ? -1 : 1, 1);
     ctx.drawImage(petImg, -40, -40, 80, 80);
     ctx.restore();
+    
+    // Desenha indicador visual se for capturável
+    if (isCapturable && !isBeingCaptured) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, canvas.height - 10, 3 + Math.sin(Date.now() / 200) * 2, 0, Math.PI * 2);
+        ctx.fill();
+    }
 }
 
 // ----------------- ANIMAÇÃO -----------------
+let animationRunning = true;
+
 function animate() {
+    if (!animationRunning) return;
+    
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    stateTimer++;
+    
+    if (!isBeingCaptured) {
+        stateTimer++;
 
-    if (walkState === 'walking') {
-        x += speedBase * direction;
-        windowX += speedBase * direction;
+        if (walkState === 'walking') {
+            x += speedBase * direction;
+            windowX += speedBase * direction;
 
-        if (windowX > screenWidth - 120) direction = -1;
-        else if (windowX < 0) direction = 1;
+            if (windowX > screenWidth - 120) direction = -1;
+            else if (windowX < 0) direction = 1;
 
-        sendWindowMoveIfNeeded(windowX);
-        walkTimer++;
+            sendWindowMoveIfNeeded(windowX);
+            walkTimer++;
 
-        maybeJump();
-        updateJump();
+            maybeJump();
+            updateJump();
 
-        if (stateTimer >= walkDuration / 16) {
-            walkState = 'idle';
-            stateTimer = 0;
-            idleDuration = getRandomDuration(1000, 3000);
-            maybeChangeDirection();
-            isJumping = false;
+            if (stateTimer >= walkDuration / 16) {
+                walkState = 'idle';
+                stateTimer = 0;
+                idleDuration = getRandomDuration(1000, 3000);
+                maybeChangeDirection();
+                isJumping = false;
+                jumpHeight = 0;
+            }
+        } else if (walkState === 'idle') {
+            walkTimer++;
             jumpHeight = 0;
-        }
-    } else if (walkState === 'idle') {
-        walkTimer++;
-        jumpHeight = 0;
-        isJumping = false;
+            isJumping = false;
 
-        if (stateTimer >= idleDuration / 16) {
-            walkState = 'walking';
-            stateTimer = 0;
-            walkDuration = getRandomDuration(2000, 5000);
+            if (stateTimer >= idleDuration / 16) {
+                walkState = 'walking';
+                stateTimer = 0;
+                walkDuration = getRandomDuration(2000, 5000);
+            }
         }
     }
 
@@ -243,19 +320,36 @@ function animate() {
 }
 
 // ----------------- XP -----------------
-setInterval(updateStats, 3000);
+if (isStarter) {
+    setInterval(updateStats, 3000);
+}
 
 // ----------------- LOAD IMAGEM -----------------
 const imagePath = path.join(__dirname, `../../../pokedex/${pokemonName.toLowerCase()}/${pokemonName.toLowerCase()}.png`);
+console.log(`[Pet ${id}] Carregando imagem de: ${imagePath}`);
+
 if (fs.existsSync(imagePath)) {
     petImg.src = `file://${imagePath.replace(/\\/g, '/')}`;
 } else {
+    console.warn(`[Pet ${id}] Imagem não encontrada, usando fallback`);
     createFallbackImage();
 }
 
 // Inicia animação quando imagem carregar
 petImg.onload = () => {
+    console.log(`[Pet ${id}] Imagem carregada com sucesso`);
     windowX = Math.random() * (screenWidth - 120);
     sendWindowMoveIfNeeded(windowX);
     animate();
 };
+
+petImg.onerror = () => {
+    console.error(`[Pet ${id}] Erro ao carregar imagem`);
+    createFallbackImage();
+};
+
+// Cleanup ao fechar
+window.addEventListener('beforeunload', () => {
+    console.log(`[Pet ${id}] Fechando janela`);
+    animationRunning = false;
+});

@@ -13,6 +13,8 @@ const FREE_LIFETIME = 20000;
 // Criar um pet (janela + card)
 // ===================
 function createPet(id, name, isStarter) {
+  console.log(`[Main] Criando pet: ${name}, ID: ${id}, Starter: ${isStarter}`);
+  
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   const startX = Math.floor(Math.random() * (width - 120));
 
@@ -27,11 +29,11 @@ function createPet(id, name, isStarter) {
     hasShadow: false,
     resizable: false,
     skipTaskbar: true,
-    acceptFirstMouse: true, // ← importante para cliques imediatos
+    acceptFirstMouse: true,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-      backgroundThrottling: false, // garante animação continua
+      backgroundThrottling: false,
       additionalArguments: [`--pokemonName=${name}`, `--starter=${isStarter}`, `--petId=${id}`],
     },
   });
@@ -57,14 +59,15 @@ function createPet(id, name, isStarter) {
   cardWin.loadFile(path.join(__dirname, '../renderer/card/card.html'));
   cardWin.setMenu(null);
 
-  pets.push({ id, petWin, cardWin, isStarter });
+  pets.push({ id, petWin, cardWin, isStarter, name });
+  
+  console.log(`[Main] Pet criado com sucesso. Total de pets: ${pets.length}`);
 }
 
 // ===================
 // Spawn de pokémon livre
-// ===================let spawnCount = 0; // contador global
-
-let spawnCount = 0; // contador global
+// ===================
+let spawnCount = 0;
 
 async function spawnFreePokemon() {
     spawnCount++;
@@ -77,7 +80,6 @@ async function spawnFreePokemon() {
       return;
     }
   
-    // pega todos os pokémons da pasta pokedex
     const pokedexPath = path.join(__dirname, '../../pokedex');
     let allPokemons = fs.readdirSync(pokedexPath).filter(file => {
       return fs.statSync(path.join(pokedexPath, file)).isDirectory();
@@ -88,9 +90,8 @@ async function spawnFreePokemon() {
       return;
     }
   
-    // escolhe um aleatório
     const freePokemonName = allPokemons[Math.floor(Math.random() * allPokemons.length)];
-    const id = Math.floor(Math.random() * 100000);
+    const id = Date.now() + Math.floor(Math.random() * 1000);
   
     createPet(id, freePokemonName, false);
     console.log(`[Spawn ${spawnCount}] Criando Pokémon livre: ${freePokemonName} (ID: ${id})`);
@@ -98,15 +99,13 @@ async function spawnFreePokemon() {
     setTimeout(() => {
       const pet = pets.find(p => p.id === id);
       if (pet) {
-        pet.petWin.close();
-        pet.cardWin.close();
+        console.log(`[Spawn ${spawnCount}] Removendo Pokémon livre: ${freePokemonName} (ID: ${id})`);
+        if (!pet.petWin.isDestroyed()) pet.petWin.close();
+        if (!pet.cardWin.isDestroyed()) pet.cardWin.close();
         pets = pets.filter(p => p.id !== id);
-        console.log(`[Spawn ${spawnCount}] Pokémon livre removido: ${freePokemonName} (ID: ${id})`);
       }
     }, FREE_LIFETIME);
-  }
-  
-  
+}
 
 // ===================
 // IPC Events
@@ -117,6 +116,8 @@ ipcMain.on('show-card', (event, id) => {
   const pet = pets.find(p => p.id === id);
   if (!pet) return;
   const { petWin, cardWin } = pet;
+  if (petWin.isDestroyed() || cardWin.isDestroyed()) return;
+  
   const { height } = screen.getPrimaryDisplay().workAreaSize;
   const winBounds = petWin.getBounds();
   cardWin.setBounds({ x: winBounds.x + 130, y: height - 260, width: 180, height: 200 });
@@ -128,6 +129,8 @@ ipcMain.on('hide-card', (event, id) => {
   const pet = pets.find(p => p.id === id);
   if (!pet) return;
   const { cardWin } = pet;
+  if (cardWin.isDestroyed()) return;
+  
   cardWin.webContents.send('hide-card');
   setTimeout(() => {
     if (!cardWin.isDestroyed()) cardWin.hide();
@@ -141,44 +144,50 @@ ipcMain.on('update-card', (event, id, data) => {
   }
 });
 
-// substitua o handler antigo por este
 ipcMain.on('move-window', (event, id, newX, jumpHeight) => {
- 
     const pet = pets.find(p => p.id === id);
-    if (!pet) return;
+    if (!pet || pet.petWin.isDestroyed()) return;
   
     const { petWin } = pet;
     const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   
-    // garante number válido para newX
     const xi = Number(newX);
     const x = Number.isFinite(xi) ? Math.max(0, Math.min(xi, width - 120)) : 0;
   
-    // jumpHeight é opcional — se não for número usamos 0 (sem movimento vertical)
     const jh = (typeof jumpHeight === 'number' && Number.isFinite(jumpHeight)) ? jumpHeight : 0;
   
-    // y fixo (acima da taskbar). jh pode reduzir y se quiser movimento vertical,
-    // mas se jh for 0 aqui ficará sempre no mesmo nível vertical.
     const yBase = height - 150;
     const y = Math.max(0, Math.min(yBase - jh, height - 120));
   
     petWin.setBounds({ x, y, width: 120, height: 120 });
-  });
-  
+});
 
 // ===================
 // Seleção de starter
 // ===================
 ipcMain.handle('select-starter', async (event, pokemonName) => {
   try {
+    console.log(`[Main] Selecionando starter: ${pokemonName}`);
+    
     await prisma.pokemon.updateMany({ where: {}, data: { isStarter: false } });
 
     const starter = await prisma.pokemon.upsert({
       where: { name: pokemonName },
       update: { isStarter: true },
-      create: { name: pokemonName, hp: 100, maxHp: 100, attack: 10, defense: 10, speed: 10, isStarter: true }
+      create: { 
+        name: pokemonName, 
+        hp: 100, 
+        maxHp: 100, 
+        attack: 10, 
+        defense: 10, 
+        speed: 10, 
+        isStarter: true 
+      }
     });
 
+    // Limpa slots anteriores
+    await prisma.teamSlot.deleteMany({});
+    
     // Adiciona no slot 1
     await prisma.teamSlot.create({
       data: { slot: 1, pokemonId: starter.id }
@@ -189,11 +198,14 @@ ipcMain.handle('select-starter', async (event, pokemonName) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win) win.close();
 
-    setInterval(spawnFreePokemon, SPAWN_INTERVAL);
+    // Inicia spawn de pokémons após 5 segundos
+    setTimeout(() => {
+      setInterval(spawnFreePokemon, SPAWN_INTERVAL);
+    }, 5000);
 
     return { success: true };
   } catch (err) {
-    console.error(err);
+    console.error('[Main] Erro ao selecionar starter:', err);
     return { success: false, error: err.message };
   }
 });
@@ -210,26 +222,97 @@ ipcMain.handle('get-available-pokemon', async () => {
       const pPath = path.join(pokedexPath, p);
       const imgPath = path.join(pPath, `${p}.png`);
       if (fs.existsSync(imgPath)) {
-        // Converte para caminho absoluto tipo file://
         pokemonList.push({
           name: p.charAt(0).toUpperCase() + p.slice(1),
-          image: `file://${imgPath.replace(/\\/g, '/')}` // importante para Windows
+          image: `file://${imgPath.replace(/\\/g, '/')}`
         });
       }
     }
   
     return pokemonList;
-  });
-  
+});
+
+// ===================
+// Captura de Pokémon
+// ===================
+ipcMain.on('capture-success', async (event, petId, pokemonData) => {
+    try {
+        console.log(`[Capture] Iniciando captura de ${pokemonData.name} (Pet ID: ${petId})`);
+
+        // Verifica se já existe
+        const existing = await prisma.pokemon.findUnique({
+            where: { name: pokemonData.name }
+        });
+
+        let capturedPokemon;
+        if (existing) {
+            console.log(`[Capture] Pokémon já existe no banco, atualizando dados`);
+            capturedPokemon = existing;
+        } else {
+            console.log(`[Capture] Criando novo registro no banco`);
+            capturedPokemon = await prisma.pokemon.create({
+                data: {
+                    name: pokemonData.name,
+                    hp: pokemonData.hp,
+                    maxHp: pokemonData.maxHp,
+                    attack: pokemonData.attack,
+                    defense: pokemonData.defense,
+                    speed: pokemonData.speed,
+                    level: pokemonData.level,
+                    xp: pokemonData.xp,
+                    isStarter: false
+                }
+            });
+        }
+
+        // Procura primeiro slot vazio (2 a 6, pois 1 é do starter)
+        let slotAdded = false;
+        for (let slot = 2; slot <= 6; slot++) {
+            const slotExists = await prisma.teamSlot.findFirst({ where: { slot } });
+            if (!slotExists) {
+                await prisma.teamSlot.create({
+                    data: { slot, pokemonId: capturedPokemon.id }
+                });
+                console.log(`[Capture] Pokémon ${pokemonData.name} adicionado ao slot ${slot}`);
+                slotAdded = true;
+                break;
+            }
+        }
+
+        if (!slotAdded) {
+            console.log(`[Capture] Equipe cheia! Pokémon capturado mas não adicionado à equipe`);
+        }
+
+        // Remove o pet da lista e fecha janelas
+        const pet = pets.find(p => p.id === petId);
+        if (pet) {
+            console.log(`[Capture] Fechando janelas do pet`);
+            
+            setTimeout(() => {
+                if (!pet.petWin.isDestroyed()) pet.petWin.close();
+                if (!pet.cardWin.isDestroyed()) pet.cardWin.close();
+            }, 500);
+            
+            pets = pets.filter(p => p.id !== petId);
+            console.log(`[Capture] Pet removido. Total de pets: ${pets.length}`);
+        }
+
+        console.log(`[Capture] Captura concluída com sucesso!`);
+    } catch (err) {
+        console.error('[Capture] Erro ao capturar Pokémon:', err);
+    }
+});
 
 // ===================
 // Inicialização do app
 // ===================
 app.whenReady().then(async () => {
+  console.log('[Main] Aplicação iniciando...');
+  
   const starter = await prisma.pokemon.findFirst({ where: { isStarter: true } });
 
   if (!starter) {
-    // Nenhum starter definido → abrir janela de seleção
+    console.log('[Main] Nenhum starter encontrado, abrindo seleção');
     const selectionWin = new BrowserWindow({
       width: 900,
       height: 600,
@@ -244,56 +327,25 @@ app.whenReady().then(async () => {
     return;
   }
 
-  // Starter já existe → cria pet
+  console.log(`[Main] Starter encontrado: ${starter.name}`);
   createPet(1, starter.name, true);
 
-  // Inicia spawn de pokémons livres
-  setInterval(spawnFreePokemon, SPAWN_INTERVAL);
+  // Inicia spawn após 5 segundos
+  setTimeout(() => {
+    console.log('[Main] Iniciando sistema de spawn');
+    setInterval(spawnFreePokemon, SPAWN_INTERVAL);
+  }, 5000);
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  if (process.platform !== 'darwin') {
+    console.log('[Main] Fechando aplicação');
+    app.quit();
+  }
 });
-// ===================
-// Captura de Pokémon
-// ===================
-ipcMain.on('capture-success', async (event, petId, pokemonData) => {
-    try {
-        console.log(`[Capture] Pokémon capturado: ${pokemonData.name} (ID do pet: ${petId})`);
 
-        // Salva o Pokémon no banco
-        const capturedPokemon = await prisma.pokemon.create({
-            data: {
-                name: pokemonData.name,
-                hp: pokemonData.hp,
-                maxHp: pokemonData.maxHp,
-                attack: pokemonData.attack,
-                defense: pokemonData.defense,
-                speed: pokemonData.speed,
-                isStarter: false
-            }
-        });
-
-        // Procura primeiro slot vazio na equipe (1 a 6)
-        for (let slot = 1; slot <= 6; slot++) {
-            const existing = await prisma.teamSlot.findFirst({ where: { slot } });
-            if (!existing) {
-                await prisma.teamSlot.create({
-                    data: { slot, pokemonId: capturedPokemon.id }
-                });
-                console.log(`[Capture] Pokémon ${pokemonData.name} adicionado ao slot ${slot}`);
-                break;
-            }
-        }
-
-        // Fecha a janela do pet
-        const pet = pets.find(p => p.id === petId);
-        if (pet) {
-            pet.petWin.close();
-            pet.cardWin.close();
-            pets = pets.filter(p => p.id !== petId);
-        }
-    } catch (err) {
-        console.error('[Capture] Erro ao capturar Pokémon:', err);
-    }
+// Cleanup ao sair
+app.on('before-quit', async () => {
+  console.log('[Main] Limpando recursos...');
+  await prisma.$disconnect();
 });
