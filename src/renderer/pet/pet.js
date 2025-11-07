@@ -20,8 +20,6 @@ const petIdArg = args.find(a => a.startsWith('--petId='));
 
 const pokemonName = pokemonNameArg ? decodeURIComponent(pokemonNameArg.split('=')[1]) : "Pikachu";
 const isStarter = isStarterArg === "--starter=true";
-
-// usa o petId que veio do main, se existir; senão gera um fallback random
 const id = petIdArg ? Number(petIdArg.split('=')[1]) : Math.floor(Math.random() * 100000);
 
 let pokemonData = {
@@ -39,14 +37,19 @@ let petImg = new Image();
 let x = 0;
 let windowX = 0;
 let direction = 1;
-let isWalking = true;
-let isJumping = false;
 let jumpHeight = 0;
 let jumpVelocity = 0;
+let isJumping = false; // <--- CORREÇÃO
 let walkTimer = 0;
 let lastSentX = null;
 
-// fallback image
+// --- Variáveis de controle de movimento ---
+let walkState = 'walking'; // walking | idle
+let walkDuration = getRandomDuration(2000, 5000);
+let idleDuration = getRandomDuration(1000, 3000);
+let stateTimer = 0;
+
+// --- Funções auxiliares ---
 function createFallbackImage() {
   const tempCanvas = document.createElement('canvas');
   tempCanvas.width = 80;
@@ -95,15 +98,26 @@ function sendWindowMoveIfNeeded(xToSend) {
   const xi = Math.floor(xToSend);
   if (lastSentX === null || xi !== lastSentX) {
     lastSentX = xi;
-    ipcRenderer.send('move-window', id, xi);
+    ipcRenderer.send('move-window', id, xi, jumpHeight);
   }
 }
 
+function getRandomDuration(min, max) {
+  return Math.floor(Math.random() * (max - min)) + min;
+}
+
+function maybeChangeDirection() {
+  if (Math.random() < 0.2) direction *= -1;
+}
+
+const walkBobAmplitude = 8; // movimento andando
+const idleBobAmplitude = 0; // movimento parado, mais sutil
+
 function animate() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  stateTimer++;
 
-  if (isWalking) {
-    maybeJump();
+  if (walkState === 'walking') {
     x += speedBase * direction;
     windowX += speedBase * direction;
 
@@ -111,24 +125,59 @@ function animate() {
     else if (windowX < 0) direction = 1;
 
     sendWindowMoveIfNeeded(windowX);
+
+    walkTimer++;
+
+    // só pula enquanto anda
+    maybeJump();
+    updateJump();
+
+    if (stateTimer >= walkDuration / 16) {
+      walkState = 'idle';
+      stateTimer = 0;
+      idleDuration = getRandomDuration(1000, 3000);
+      maybeChangeDirection();
+
+      // parar o salto
+      isJumping = false;
+      jumpHeight = 0;
+    }
+  } else if (walkState === 'idle') {
+    walkTimer++;
+
+    // Nenhum salto enquanto idle
+    jumpHeight = 0;
+    isJumping = false;
+
+    if (stateTimer >= idleDuration / 16) {
+      walkState = 'walking';
+      stateTimer = 0;
+      walkDuration = getRandomDuration(2000, 5000);
+    }
   }
 
-  updateJump();
-  walkTimer++;
+  // bob diferente para walking vs idle
+// bob diferente para walking vs idle
+const bobAmplitudeCurrent = (walkState === 'walking') ? walkBobAmplitude : idleBobAmplitude;
+const bob = Math.abs(Math.sin(walkTimer * 0.12)) * bobAmplitudeCurrent;
 
-  const bob = Math.abs(Math.sin(walkTimer * 0.12)) * bobAmplitude;
-  const drawY = canvas.height - 80 - bob - jumpHeight;
+// ajusta a altura do sprite (maior valor → mais próximo da barra)
+const baseOffset = 55;
+const drawY = canvas.height - baseOffset - bob - jumpHeight;
 
-  ctx.save();
-  ctx.translate(canvas.width / 2, drawY + 40);
-  ctx.scale(direction === -1 ? -1 : 1, 1);
-  ctx.drawImage(petImg, -40, -40, 80, 80);
-  ctx.restore();
+ctx.save();
+ctx.translate(canvas.width / 2, drawY + 40);
+ctx.scale(direction === 1 ? -1 : 1, 1);
+ctx.drawImage(petImg, -40, -40, 80, 80);
+ctx.restore();
+
 
   requestAnimationFrame(animate);
 }
 
-// Hover events
+  
+
+// --- Eventos hover ---
 const hoverZone = document.getElementById('hoverZone');
 hoverZone.addEventListener('mouseenter', () => ipcRenderer.send('show-card', id));
 hoverZone.addEventListener('mouseleave', () => ipcRenderer.send('hide-card', id));
@@ -141,6 +190,7 @@ const imagePath = path.join(__dirname, `../../../pokedex/${pokemonName.toLowerCa
 if (fs.existsSync(imagePath)) petImg.src = imagePath;
 else createFallbackImage();
 
+// inicia animação
 petImg.onload = () => {
   windowX = Math.random() * (screenWidth - 120);
   sendWindowMoveIfNeeded(windowX);

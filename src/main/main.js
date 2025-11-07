@@ -61,27 +61,51 @@ function createPet(id, name, isStarter) {
 
 // ===================
 // Spawn de pokémon livre
-// ===================
+// ===================let spawnCount = 0; // contador global
+
+let spawnCount = 0; // contador global
+
 async function spawnFreePokemon() {
-  const freeCount = pets.filter(p => !p.isStarter).length;
-  if (freeCount >= MAX_FREE_POKEMONS) return;
-
-  const allPokemons = await prisma.pokemon.findMany({ where: { isStarter: false } });
-  if (!allPokemons.length) return;
-
-  const freePokemon = allPokemons[Math.floor(Math.random() * allPokemons.length)];
-  const id = Math.floor(Math.random() * 100000);
-  createPet(id, freePokemon.name, false);
-
-  setTimeout(() => {
-    const pet = pets.find(p => p.id === id);
-    if (pet) {
-      pet.petWin.close();
-      pet.cardWin.close();
-      pets = pets.filter(p => p.id !== id);
+    spawnCount++;
+    const now = new Date().toLocaleTimeString();
+    console.log(`[Spawn ${spawnCount}] Tentando spawn às ${now}`);
+  
+    const freeCount = pets.filter(p => !p.isStarter).length;
+    if (freeCount >= MAX_FREE_POKEMONS) {
+      console.log(`[Spawn ${spawnCount}] Limite de pokémons livres atingido (${freeCount}/${MAX_FREE_POKEMONS})`);
+      return;
     }
-  }, FREE_LIFETIME);
-}
+  
+    // pega todos os pokémons da pasta pokedex
+    const pokedexPath = path.join(__dirname, '../../pokedex');
+    let allPokemons = fs.readdirSync(pokedexPath).filter(file => {
+      return fs.statSync(path.join(pokedexPath, file)).isDirectory();
+    });
+  
+    if (!allPokemons.length) {
+      console.log(`[Spawn ${spawnCount}] Nenhum pokémon disponível na Pokédex`);
+      return;
+    }
+  
+    // escolhe um aleatório
+    const freePokemonName = allPokemons[Math.floor(Math.random() * allPokemons.length)];
+    const id = Math.floor(Math.random() * 100000);
+  
+    createPet(id, freePokemonName, false);
+    console.log(`[Spawn ${spawnCount}] Criando Pokémon livre: ${freePokemonName} (ID: ${id})`);
+  
+    setTimeout(() => {
+      const pet = pets.find(p => p.id === id);
+      if (pet) {
+        pet.petWin.close();
+        pet.cardWin.close();
+        pets = pets.filter(p => p.id !== id);
+        console.log(`[Spawn ${spawnCount}] Pokémon livre removido: ${freePokemonName} (ID: ${id})`);
+      }
+    }, FREE_LIFETIME);
+  }
+  
+  
 
 // ===================
 // IPC Events
@@ -118,7 +142,7 @@ ipcMain.on('update-card', (event, id, data) => {
 
 // substitua o handler antigo por este
 ipcMain.on('move-window', (event, id, newX, jumpHeight) => {
-    console.log('move-window received:', { id, newX, jumpHeight });
+ 
     const pet = pets.find(p => p.id === id);
     if (!pet) return;
   
