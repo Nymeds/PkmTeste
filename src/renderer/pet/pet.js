@@ -39,56 +39,136 @@ let squashTimer = 0;
 const squashDuration = 8;
 
 // ==========================================
-// CARD DE STATS
+// CARD DE STATS - COMPONENTE DINÂMICO
 // ==========================================
-// ==========================================
-// CARD DE STATS
-// ==========================================
-const statsCard = document.getElementById('statsCard');
 const hoverZone = document.getElementById('hoverZone');
-let cardVisible = false;
-let hideTimeout = null;
+const statsCardContainer = document.getElementById('statsCardContainer');
+let statsCard = null;
+let isCardVisible = false;
+let hideCardTimeout = null;
 
-hoverZone.addEventListener('mouseenter', () => {
-    clearTimeout(hideTimeout);
-    if (!cardVisible) {
-        console.log('Mostrando card...');
-        statsCard.classList.add('visible');
-        cardVisible = true;
+function createStatsCard() {
+    if (!pokemonData) {
+        console.log('⚠️ Tentando criar card sem dados do pokémon');
+        return null;
     }
-});
 
-hoverZone.addEventListener('mouseleave', (e) => {
-    const cardRect = statsCard.getBoundingClientRect();
-    const overCard = (
-        e.clientX >= cardRect.left &&
-        e.clientX <= cardRect.right &&
-        e.clientY >= cardRect.top &&
-        e.clientY <= cardRect.bottom
-    );
+    console.log('🎨 Criando card de stats para:', pokemonData.name);
+
+    const xpForNextLevel = pokemonData.level * 100;
+    const hpPercent = (pokemonData.hp / pokemonData.maxHp) * 100;
+    const xpPercent = (pokemonData.xp / xpForNextLevel) * 100;
+
+    const card = document.createElement('div');
+    card.className = 'stats-card';
+    card.innerHTML = `
+        <div class="card-header">
+            <div class="pokemon-name">${pokemonData.name}</div>
+            <div class="level">Nível ${pokemonData.level}</div>
+        </div>
+        
+        <div class="hp-bar-container">
+            <div class="hp-bar">
+                <div class="hp-bar-fill" style="width: ${hpPercent}%"></div>
+                <div class="hp-text">${pokemonData.hp}/${pokemonData.maxHp}</div>
+            </div>
+        </div>
+
+        <div class="xp-bar-container">
+            <div class="xp-bar">
+                <div class="xp-bar-fill" style="width: ${xpPercent}%"></div>
+            </div>
+            <div class="xp-text">${pokemonData.xp} / ${xpForNextLevel} XP</div>
+        </div>
+
+        <div class="stat-row">
+            <span class="stat-label">⚔️ Ataque:</span>
+            <span class="stat-value">${pokemonData.attack}</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">🛡️ Defesa:</span>
+            <span class="stat-value">${pokemonData.defense}</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">⚡ Velocidade:</span>
+            <span class="stat-value">${pokemonData.speed}</span>
+        </div>
+    `;
+
+    // Eventos do card
+    card.addEventListener('mouseenter', () => {
+        clearTimeout(hideCardTimeout);
+    });
+
+    card.addEventListener('mouseleave', () => {
+        hideCardTimeout = setTimeout(() => {
+            hideStatsCard();
+        }, 300);
+    });
+
+    return card;
+}
+
+function showStatsCard() {
+    if (isCardVisible || !pokemonData) return;
+
+    console.log('👁️ Mostrando card de stats');
+    clearTimeout(hideCardTimeout);
+
+    statsCard = createStatsCard();
+    if (statsCard) {
+        statsCardContainer.innerHTML = '';
+        statsCardContainer.appendChild(statsCard);
+        isCardVisible = true;
+    }
+}
+
+function hideStatsCard() {
+    if (!isCardVisible) return;
+
+    console.log('🙈 Escondendo card de stats');
     
-    if (!overCard) {
-        hideTimeout = setTimeout(() => {
-            hideCard();
+    if (statsCard) {
+        statsCard.style.animation = 'fadeInCard 0.2s ease-out reverse';
+        setTimeout(() => {
+            if (statsCardContainer) {
+                statsCardContainer.innerHTML = '';
+            }
+            statsCard = null;
+            isCardVisible = false;
         }, 200);
     }
-});
-
-statsCard.addEventListener('mouseenter', () => {
-    clearTimeout(hideTimeout);
-});
-
-statsCard.addEventListener('mouseleave', () => {
-    hideTimeout = setTimeout(() => {
-        hideCard();
-    }, 200);
-});
-
-function hideCard() {
-    console.log('Escondendo card...');
-    statsCard.classList.remove('visible');
-    cardVisible = false;
 }
+
+function updateStatsCardIfVisible() {
+    if (isCardVisible && statsCard && pokemonData) {
+        // Atualiza o card existente sem recriá-lo
+        const xpForNextLevel = pokemonData.level * 100;
+        const hpPercent = (pokemonData.hp / pokemonData.maxHp) * 100;
+        const xpPercent = (pokemonData.xp / xpForNextLevel) * 100;
+
+        statsCard.querySelector('.pokemon-name').textContent = pokemonData.name;
+        statsCard.querySelector('.level').textContent = `Nível ${pokemonData.level}`;
+        statsCard.querySelector('.hp-bar-fill').style.width = `${hpPercent}%`;
+        statsCard.querySelector('.hp-text').textContent = `${pokemonData.hp}/${pokemonData.maxHp}`;
+        statsCard.querySelector('.xp-bar-fill').style.width = `${xpPercent}%`;
+        statsCard.querySelector('.xp-text').textContent = `${pokemonData.xp} / ${xpForNextLevel} XP`;
+        statsCard.querySelectorAll('.stat-value')[0].textContent = pokemonData.attack;
+        statsCard.querySelectorAll('.stat-value')[1].textContent = pokemonData.defense;
+        statsCard.querySelectorAll('.stat-value')[2].textContent = pokemonData.speed;
+    }
+}
+
+// Eventos da zona de hover
+hoverZone.addEventListener('mouseenter', () => {
+    showStatsCard();
+});
+
+hoverZone.addEventListener('mouseleave', () => {
+    hideCardTimeout = setTimeout(() => {
+        hideStatsCard();
+    }, 300);
+});
 
 // ==========================================
 // CARREGAR DADOS DO POKÉMON
