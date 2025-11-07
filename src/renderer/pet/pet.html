@@ -29,20 +29,36 @@
         }
 
        /* Torna o card visível quando a classe 'visible' está presente */
-#statsCard {
+       /* Torna o card visível quando a classe 'visible' está presente */
+       #statsCard {
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.2s;
+    transition: opacity 0.3s ease;
     position: absolute;
-    left: 120px;
+    left: 125px;
     top: 0;
-    z-index: 100;
+    z-index: 1000;
+    width: 220px;
+    min-height: 280px;
 }
 
 #statsCard.visible {
-    opacity: 1;
+    opacity: 1 !important;
     pointer-events: auto;
 }
+
+        .card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            padding: 15px;
+            width: 100%;
+            min-height: 280px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(10px);
+        }
 
         .card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);

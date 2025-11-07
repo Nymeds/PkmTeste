@@ -41,41 +41,53 @@ const squashDuration = 8;
 // ==========================================
 // CARD DE STATS
 // ==========================================
+// ==========================================
+// CARD DE STATS
+// ==========================================
 const statsCard = document.getElementById('statsCard');
 const hoverZone = document.getElementById('hoverZone');
 let cardVisible = false;
+let hideTimeout = null;
 
 hoverZone.addEventListener('mouseenter', () => {
+    clearTimeout(hideTimeout);
     if (!cardVisible) {
+        console.log('Mostrando card...');
         statsCard.classList.add('visible');
         cardVisible = true;
-        // Permite clique no card
-        statsCard.style.pointerEvents = 'auto';
     }
 });
 
-// Remova o evento antigo de mouseleave do hoverZone e use este:
 hoverZone.addEventListener('mouseleave', (e) => {
-    // Só esconde se o mouse não está sobre o card
     const cardRect = statsCard.getBoundingClientRect();
-    if (
-        e.clientX < cardRect.left ||
-        e.clientX > cardRect.right ||
-        e.clientY < cardRect.top ||
-        e.clientY > cardRect.bottom
-    ) {
-        hideCard();
+    const overCard = (
+        e.clientX >= cardRect.left &&
+        e.clientX <= cardRect.right &&
+        e.clientY >= cardRect.top &&
+        e.clientY <= cardRect.bottom
+    );
+    
+    if (!overCard) {
+        hideTimeout = setTimeout(() => {
+            hideCard();
+        }, 200);
     }
+});
+
+statsCard.addEventListener('mouseenter', () => {
+    clearTimeout(hideTimeout);
 });
 
 statsCard.addEventListener('mouseleave', () => {
-    hideCard();
+    hideTimeout = setTimeout(() => {
+        hideCard();
+    }, 200);
 });
 
 function hideCard() {
+    console.log('Escondendo card...');
     statsCard.classList.remove('visible');
     cardVisible = false;
-    statsCard.style.pointerEvents = 'none';
 }
 
 // ==========================================
