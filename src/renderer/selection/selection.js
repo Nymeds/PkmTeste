@@ -1,132 +1,68 @@
 const { ipcRenderer } = require('electron');
-const path = require('path');
-const fs = require('fs');
 
+const container = document.getElementById('starter-container');
+const confirmBtn = document.getElementById('confirmBtn');
 let selectedPokemon = null;
 
-// ==========================================
-// CARREGAR POKÉMON DISPONÍVEIS
-// ==========================================
-async function loadPokemon() {
-    try {
-        const pokemon = await ipcRenderer.invoke('get-available-pokemon');
-        displayPokemon(pokemon);
-    } catch (error) {
-        console.error('Error loading pokemon:', error);
-        document.getElementById('content').innerHTML = `
-            <div style="color: white; text-align: center;">
-                <h2>Erro ao carregar Pokémon</h2>
-                <p>${error.message}</p>
-            </div>
-        `;
-    }
-}
-
-// ==========================================
-// EXIBIR POKÉMON NA TELA
-// ==========================================
-function displayPokemon(pokemonList) {
-    const content = document.getElementById('content');
-    content.className = 'pokemon-grid';
-    content.innerHTML = '';
-
-    pokemonList.forEach(pokemon => {
-        const card = createPokemonCard(pokemon);
-        content.appendChild(card);
-    });
-}
-
-// ==========================================
-// CRIAR CARD DE POKÉMON
-// ==========================================
-function createPokemonCard(pokemon) {
+// Criar card
+function createCard(pokemon) {
     const card = document.createElement('div');
-    card.className = 'pokemon-card';
-    card.dataset.name = pokemon.name;
+    card.classList.add('pokemon-card');
 
-    // Caminho da imagem
-    const imagePath = path.join(__dirname, '../../../pokedex', pokemon.name.toLowerCase(), `${pokemon.name.toLowerCase()}.png`);
-    
-    // Verifica se a imagem existe, senão usa placeholder
-    let imageUrl = `../../../pokedex/${pokemon.name.toLowerCase()}/${pokemon.name.toLowerCase()}.png`;
-    if (!fs.existsSync(imagePath)) {
-        imageUrl = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iI2YwZjBmMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTYiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj4/PC90ZXh0Pjwvc3ZnPg==';
-    }
+    const img = document.createElement('img');
+    img.src = pokemon.image; // caminho absoluto vindo do main
+    img.alt = pokemon.name;
+    img.classList.add('pokemon-image');
+    card.appendChild(img);
 
-    card.innerHTML = `
-        <img src="${imageUrl}" alt="${pokemon.name}" class="pokemon-image" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iI2YwZjBmMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTYiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj4/PC90ZXh0Pjwvc3ZnPg=='" />
-        <div class="pokemon-name">${pokemon.name}</div>
-        <div class="pokemon-stats">
-            <div class="stat">
-                <span class="stat-label">HP</span>
-                <span>${pokemon.hp}</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">ATK</span>
-                <span>${pokemon.attack}</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">DEF</span>
-                <span>${pokemon.defense}</span>
-            </div>
-        </div>
-    `;
+    const name = document.createElement('p');
+    name.innerText = pokemon.name;
+    name.classList.add('pokemon-name');
+    card.appendChild(name);
 
-    card.addEventListener('click', () => selectPokemon(card, pokemon.name));
-
-    return card;
-}
-
-// ==========================================
-// SELECIONAR POKÉMON
-// ==========================================
-function selectPokemon(card, name) {
-    // Remove seleção anterior
-    document.querySelectorAll('.pokemon-card').forEach(c => {
-        c.classList.remove('selected');
+    // Clique para selecionar starter
+    card.addEventListener('click', () => {
+        // Remove seleção anterior
+        document.querySelectorAll('.pokemon-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        selectedPokemon = pokemon.name;
+        confirmBtn.classList.add('visible');
     });
 
-    // Adiciona seleção ao card clicado
-    card.classList.add('selected');
-    selectedPokemon = name;
-
-    // Mostra botão de confirmação
-    const confirmBtn = document.getElementById('confirmBtn');
-    confirmBtn.classList.add('visible');
+    container.appendChild(card);
 }
 
-// ==========================================
-// CONFIRMAR ESCOLHA
-// ==========================================
-document.getElementById('confirmBtn').addEventListener('click', async () => {
-    if (!selectedPokemon) return;
-
-    const confirmBtn = document.getElementById('confirmBtn');
-    confirmBtn.textContent = 'Criando seu companheiro...';
-    confirmBtn.disabled = true;
-
+// Carregar starters
+async function loadStarters() {
     try {
-        const result = await ipcRenderer.invoke('select-starter', selectedPokemon);
+        const pokemons = await ipcRenderer.invoke('get-available-pokemon');
+
+        // Remove loading
+        const loadingDiv = document.getElementById('content');
+        if (loadingDiv) loadingDiv.style.display = 'none';
+
+        // Limpa container
+        container.innerHTML = '';
         
-        if (result.success) {
-            console.log(`✅ ${selectedPokemon} escolhido como inicial!`);
-            // A janela será fechada pelo processo principal
-        } else {
-            alert('Erro ao escolher o Pokémon: ' + result.error);
-            confirmBtn.textContent = 'Confirmar Escolha';
-            confirmBtn.disabled = false;
+        if (!pokemons || pokemons.length === 0) {
+            container.innerHTML = '<p style="color:white;text-align:center;">Nenhum Pokémon disponível!</p>';
+            return;
         }
-    } catch (error) {
-        console.error('Error selecting starter:', error);
-        alert('Erro ao escolher o Pokémon');
-        confirmBtn.textContent = 'Confirmar Escolha';
-        confirmBtn.disabled = false;
+
+        pokemons.forEach(p => createCard(p));
+    } catch (err) {
+        console.error('Erro ao carregar starters:', err);
+        container.innerHTML = '<p style="color:red;text-align:center;">Erro ao carregar Pokédex</p>';
     }
+}
+
+// Confirmar escolha
+confirmBtn.addEventListener('click', async () => {
+    if (!selectedPokemon) return;
+    const result = await ipcRenderer.invoke('select-starter', selectedPokemon);
+    if (result.success) console.log(`${selectedPokemon} escolhido como starter!`);
+    else console.error(result.error);
 });
 
-// ==========================================
-// INICIALIZAÇÃO
-// ==========================================
-window.addEventListener('DOMContentLoaded', () => {
-    loadPokemon();
-});
+// Inicializa
+loadStarters();

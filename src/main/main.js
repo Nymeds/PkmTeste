@@ -1,20 +1,25 @@
 const { app, BrowserWindow, screen, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
-let win = null;
-let cardWin = null;
-let cardReady = false;
+let pets = [];
+const SPAWN_INTERVAL = 30000;
+const MAX_FREE_POKEMONS = 3;
+const FREE_LIFETIME = 20000;
 
-// =====================================================
-// Cria a janela principal (pet)
-// =====================================================
-function createPetWindow() {
+// ===================
+// Criar um pet (janela + card)
+// ===================
+function createPet(id, name, isStarter) {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  const startX = Math.floor(Math.random() * (width - 120));
 
-  win = new BrowserWindow({
+  const petWin = new BrowserWindow({
     width: 120,
     height: 120,
-    x: Math.floor(Math.random() * (width - 120)),
+    x: startX,
     y: height - 150,
     frame: false,
     transparent: true,
@@ -25,29 +30,16 @@ function createPetWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
+      additionalArguments: [`--pokemonName=${name}`, `--starter=${isStarter}`],
     },
   });
+  petWin.loadFile(path.join(__dirname, '../renderer/pet/pet.html'));
+  petWin.setMenu(null);
 
-  win.loadFile(path.join(__dirname, '../renderer/pet/pet.html'));
-  win.setMenu(null);
-
-  win.on('closed', () => {
-    win = null;
-  });
-
-  win.once('ready-to-show', () => {
-    console.log('✅ Pet window ready');
-  });
-}
-
-// =====================================================
-// Cria a janela do card flutuante
-// =====================================================
-function createCardWindow() {
-  cardWin = new BrowserWindow({
+  const cardWin = new BrowserWindow({
     width: 180,
     height: 200,
-    show: false, // start hidden
+    show: false,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -59,129 +51,176 @@ function createCardWindow() {
       contextIsolation: false,
     },
   });
-
   cardWin.loadFile(path.join(__dirname, '../renderer/card/card.html'));
   cardWin.setMenu(null);
 
-  // marca quando o renderer do card terminou de carregar
-  cardWin.webContents.on('did-finish-load', () => {
-    cardReady = true;
-    console.log('✅ Card renderer finished loading (cardReady = true)');
-  });
-
-  cardWin.on('closed', () => {
-    cardWin = null;
-    cardReady = false;
-  });
+  pets.push({ id, petWin, cardWin, isStarter });
 }
 
-// =====================================================
-// Helper: posiciona o card relativo ao pet window
-// =====================================================
-function positionCardNearPet() {
-  if (!win || !cardWin) return;
+// ===================
+// Spawn de pokémon livre
+// ===================
+async function spawnFreePokemon() {
+  const freeCount = pets.filter(p => !p.isStarter).length;
+  if (freeCount >= MAX_FREE_POKEMONS) return;
+
+  const allPokemons = await prisma.pokemon.findMany({ where: { isStarter: false } });
+  if (!allPokemons.length) return;
+
+  const freePokemon = allPokemons[Math.floor(Math.random() * allPokemons.length)];
+  const id = Math.floor(Math.random() * 100000);
+  createPet(id, freePokemon.name, false);
+
+  setTimeout(() => {
+    const pet = pets.find(p => p.id === id);
+    if (pet) {
+      pet.petWin.close();
+      pet.cardWin.close();
+      pets = pets.filter(p => p.id !== id);
+    }
+  }, FREE_LIFETIME);
+}
+
+// ===================
+// IPC Events
+// ===================
+
+// Mostrar / esconder card
+ipcMain.on('show-card', (event, id) => {
+  const pet = pets.find(p => p.id === id);
+  if (!pet) return;
+  const { petWin, cardWin } = pet;
+  const { height } = screen.getPrimaryDisplay().workAreaSize;
+  const winBounds = petWin.getBounds();
+  cardWin.setBounds({ x: winBounds.x + 130, y: height - 260, width: 180, height: 200 });
+  cardWin.showInactive();
+  cardWin.webContents.send('show-card');
+});
+
+ipcMain.on('hide-card', (event, id) => {
+  const pet = pets.find(p => p.id === id);
+  if (!pet) return;
+  const { cardWin } = pet;
+  cardWin.webContents.send('hide-card');
+  setTimeout(() => {
+    if (!cardWin.isDestroyed()) cardWin.hide();
+  }, 250);
+});
+
+ipcMain.on('update-card', (event, id, data) => {
+  const pet = pets.find(p => p.id === id);
+  if (pet && pet.cardWin && !pet.cardWin.isDestroyed()) {
+    pet.cardWin.webContents.send('update-stats', data);
+  }
+});
+
+// substitua o handler antigo por este
+ipcMain.on('move-window', (event, id, newX, jumpHeight) => {
+    const pet = pets.find(p => p.id === id);
+    if (!pet) return;
+  
+    const { petWin } = pet;
+    const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  
+    // garante number válido para newX
+    const xi = Number(newX);
+    const x = Number.isFinite(xi) ? Math.max(0, Math.min(xi, width - 120)) : 0;
+  
+    // jumpHeight é opcional — se não for número usamos 0 (sem movimento vertical)
+    const jh = (typeof jumpHeight === 'number' && Number.isFinite(jumpHeight)) ? jumpHeight : 0;
+  
+    // y fixo (acima da taskbar). jh pode reduzir y se quiser movimento vertical,
+    // mas se jh for 0 aqui ficará sempre no mesmo nível vertical.
+    const yBase = height - 150;
+    const y = Math.max(0, Math.min(yBase - jh, height - 120));
+  
+    petWin.setBounds({ x, y, width: 120, height: 120 });
+  });
+  
+
+// ===================
+// Seleção de starter
+// ===================
+ipcMain.handle('select-starter', async (event, pokemonName) => {
   try {
-    const winBounds = win.getBounds();
-    const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize;
+    await prisma.pokemon.updateMany({ where: {}, data: { isStarter: false } });
 
-    // ajuste offsets conforme você quiser (mais à direita/embaixo/etc)
-    const offsetX = 100; // distância em relação ao pet
-    const offsetY = 260; // distância vertical em relação ao fundo
+    const starter = await prisma.pokemon.upsert({
+      where: { name: pokemonName },
+      update: { isStarter: true },
+      create: { name: pokemonName, hp: 100, maxHp: 100, attack: 10, defense: 10, speed: 10, isStarter: true }
+    });
 
-    // calcula posição do card (colocado à direita do pet, acima)
-    let cardX = winBounds.x + offsetX;
-    // evita sair da tela à direita
-    const cardWidth = 180;
-    if (cardX + cardWidth > screenW - 10) cardX = screenW - cardWidth - 10;
-    // mantém dentro da tela esquerda
-    if (cardX < 10) cardX = 10;
+    // Adiciona no slot 1
+    await prisma.teamSlot.create({
+      data: { slot: 1, pokemonId: starter.id }
+    });
 
-    const cardY = screenH - offsetY;
+    createPet(1, starter.name, true);
 
-    cardWin.setBounds({ x: Math.round(cardX), y: Math.round(cardY), width: cardWidth, height: 200 });
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) win.close();
+
+    setInterval(spawnFreePokemon, SPAWN_INTERVAL);
+
+    return { success: true };
   } catch (err) {
-    console.error('Erro ao posicionar card:', err);
+    console.error(err);
+    return { success: false, error: err.message };
   }
-}
+});
 
-// =====================================================
-// Mostra / oculta o card com posição atualizada
-// =====================================================
-ipcMain.on('show-card', () => {
-  if (!win || !cardWin || win.isDestroyed() || cardWin.isDestroyed()) {
-    console.warn('show-card: janelas não prontas');
-    return;
-  }
+// ===================
+// Retorna os starters da pasta pokedex
+// ===================
+ipcMain.handle('get-available-pokemon', async () => {
+    const pokedexPath = path.join(__dirname, '../../pokedex');
+    const starters = ['pikachu', 'charmander', 'squirtle', 'bulbasaur'];
+    const pokemonList = [];
+  
+    for (const p of starters) {
+      const pPath = path.join(pokedexPath, p);
+      const imgPath = path.join(pPath, `${p}.png`);
+      if (fs.existsSync(imgPath)) {
+        // Converte para caminho absoluto tipo file://
+        pokemonList.push({
+          name: p.charAt(0).toUpperCase() + p.slice(1),
+          image: `file://${imgPath.replace(/\\/g, '/')}` // importante para Windows
+        });
+      }
+    }
+  
+    return pokemonList;
+  });
+  
 
-  // garante que o card já carregou seu renderer antes de enviar o evento
-  if (!cardReady) {
-    // tenta esperar um pouco (se quiser, aumentar timeout)
-    cardWin.webContents.once('did-finish-load', () => {
-      try {
-        positionCardNearPet();
-        cardWin.showInactive();
-        cardWin.webContents.send('show-card');
-        console.log('👁️ Card mostrado (após finish-load)');
-      } catch (e) {
-        console.error('Erro ao mostrar card após finish-load:', e);
+// ===================
+// Inicialização do app
+// ===================
+app.whenReady().then(async () => {
+  const starter = await prisma.pokemon.findFirst({ where: { isStarter: true } });
+
+  if (!starter) {
+    // Nenhum starter definido → abrir janela de seleção
+    const selectionWin = new BrowserWindow({
+      width: 900,
+      height: 600,
+      resizable: false,
+      frame: true,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false
       }
     });
+    selectionWin.loadFile(path.join(__dirname, '../renderer/selection/selection.html'));
     return;
   }
 
-  // posiciona e mostra
-  positionCardNearPet();
-  cardWin.showInactive(); // mostra sem roubar foco
-  cardWin.webContents.send('show-card'); // informa o renderer para adicionar .visible
-  console.log('👁️ Card mostrado (imediato)');
-});
+  // Starter já existe → cria pet
+  createPet(1, starter.name, true);
 
-// pede para o card ocultar (renderer fará o fade-out)
-ipcMain.on('hide-card', () => {
-  if (!cardWin || cardWin.isDestroyed()) return;
-
-  // avisa o renderer pra remover a classe visible (fade-out)
-  cardWin.webContents.send('hide-card');
-
-  // encontra o tempo igual à animação CSS (250ms aqui) e oculta de verdade
-  setTimeout(() => {
-    if (cardWin && !cardWin.isDestroyed()) {
-      cardWin.hide();
-      console.log('🙈 Card escondido');
-    }
-  }, 300);
-});
-
-// =====================================================
-// Atualiza o card com dados do pet
-// =====================================================
-ipcMain.on('update-card', (event, data) => {
-  if (cardWin && !cardWin.isDestroyed() && cardReady) {
-    cardWin.webContents.send('update-stats', data);
-  }
-});
-
-// =====================================================
-// Mover a janela do pet (enquanto se move, atualiza card se visível)
-// =====================================================
-ipcMain.on('move-window', (event, newX) => {
-  if (!win || win.isDestroyed()) return;
-  const { height } = screen.getPrimaryDisplay().workAreaSize;
-  win.setBounds({ x: newX, y: height - 150, width: 120, height: 120 });
-
-  // se o card estiver visível, reposiciona ele em tempo real
-  if (cardWin && !cardWin.isDestroyed() && cardWin.isVisible()) {
-    positionCardNearPet();
-  }
-});
-
-// =====================================================
-// Inicialização do app
-// =====================================================
-app.whenReady().then(() => {
-  createPetWindow();
-  createCardWindow();
-  console.log('App ready — janelas criadas');
+  // Inicia spawn de pokémons livres
+  setInterval(spawnFreePokemon, SPAWN_INTERVAL);
 });
 
 app.on('window-all-closed', () => {

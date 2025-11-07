@@ -1,130 +1,52 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <title>Card do Pokémon</title>
-  <style>
-    body {
-      margin: 0;
-      background: transparent;
-      font-family: 'Segoe UI', sans-serif;
-      color: white;
-      overflow: hidden;
-    }
-
-    .card {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      border-radius: 12px;
-      padding: 10px;
-      box-shadow: 0 6px 25px rgba(0, 0, 0, 0.5);
-      border: 2px solid rgba(255, 255, 255, 0.25);
-      width: 160px;
-      min-height: 160px;
-      backdrop-filter: blur(8px);
-      opacity: 0;
-      transform: scale(0.9);
-      transition: opacity 0.25s ease, transform 0.25s ease;
-    }
-
-    .card.visible {
-      opacity: 1;
-      transform: scale(1);
-    }
-
-    .pokemon-name {
-      font-size: 1.1em;
-      font-weight: bold;
-      text-align: center;
-      margin-bottom: 6px;
-    }
-
-    .level {
-      text-align: center;
-      font-size: 0.8em;
-      opacity: 0.9;
-      margin-bottom: 8px;
-    }
-
-    .hp-bar, .xp-bar {
-      background: rgba(255, 255, 255, 0.15);
-      border-radius: 8px;
-      overflow: hidden;
-      margin: 4px 0;
-    }
-
-    .hp-bar-fill {
-      height: 14px;
-      background: linear-gradient(90deg, #4ade80 0%, #22c55e 100%);
-      width: 100%;
-      transition: width 0.3s ease;
-    }
-
-    .xp-bar-fill {
-      height: 6px;
-      background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%);
-      width: 0%;
-      transition: width 0.3s ease;
-    }
-
-    .center-text {
-      text-align: center;
-      font-size: 0.75em;
-      margin-top: 2px;
-      opacity: 0.9;
-    }
-
-    .stat-row {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 4px;
-      font-size: 0.8em;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>Card do Pokémon</title>
+<style>
+body { margin:0; background:transparent; font-family:sans-serif; color:white; overflow:hidden; }
+.card { background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); border-radius:12px; padding:10px; width:160px; min-height:160px; opacity:0; transform:scale(0.9); transition:opacity 0.25s, transform 0.25s; }
+.card.visible { opacity:1; transform:scale(1); }
+.pokemon-name { font-weight:bold; text-align:center; margin-bottom:6px; }
+.level { text-align:center; font-size:0.8em; opacity:0.9; margin-bottom:8px; }
+.hp-bar,.xp-bar { background:rgba(255,255,255,0.15); border-radius:8px; overflow:hidden; margin:4px 0; }
+.hp-bar-fill { height:14px; background:linear-gradient(90deg,#4ade80 0%,#22c55e 100%); width:100%; transition:width 0.3s; }
+.xp-bar-fill { height:6px; background:linear-gradient(90deg,#fbbf24 0%,#f59e0b 100%); width:0%; transition:width 0.3s; }
+.center-text { text-align:center; font-size:0.75em; margin-top:2px; opacity:0.9; }
+.stat-row { display:flex; justify-content:space-between; margin-top:4px; font-size:0.8em; }
+</style>
 </head>
 <body>
-  <div class="card" id="card">
-    <div class="pokemon-name" id="pokemonName">Carregando...</div>
-    <div class="level" id="pokemonLevel">Nível 1</div>
+<div class="card" id="card">
+  <div class="pokemon-name" id="pokemonName">Carregando...</div>
+  <div class="level" id="pokemonLevel">Nível 1</div>
+  <div class="hp-bar"><div class="hp-bar-fill" id="hpBarFill"></div></div>
+  <div class="center-text" id="hpText">100/100</div>
+  <div class="xp-bar"><div class="xp-bar-fill" id="xpBarFill"></div></div>
+  <div class="center-text" id="xpText">0 / 100 XP</div>
+  <div class="stat-row"><span>⚔️ Ataque:</span><span id="attackValue">0</span></div>
+  <div class="stat-row"><span>🛡️ Defesa:</span><span id="defenseValue">0</span></div>
+  <div class="stat-row"><span>⚡ Velocidade:</span><span id="speedValue">0</span></div>
+</div>
 
-    <div class="hp-bar">
-      <div class="hp-bar-fill" id="hpBarFill"></div>
-    </div>
-    <div class="center-text" id="hpText">100/100</div>
+<script>
+const { ipcRenderer } = require('electron');
+const card = document.getElementById('card');
 
-    <div class="xp-bar">
-      <div class="xp-bar-fill" id="xpBarFill"></div>
-    </div>
-    <div class="center-text" id="xpText">0 / 100 XP</div>
+ipcRenderer.on('update-stats', (e,data)=>{
+  document.getElementById('pokemonName').textContent=data.name;
+  document.getElementById('pokemonLevel').textContent=`Nível ${data.level}`;
+  document.getElementById('hpBarFill').style.width=`${(data.hp/data.maxHp)*100}%`;
+  document.getElementById('hpText').textContent=`${data.hp}/${data.maxHp}`;
+  document.getElementById('xpBarFill').style.width=`${(data.xp/(data.level*100))*100}%`;
+  document.getElementById('xpText').textContent=`${data.xp} / ${data.level*100} XP`;
+  document.getElementById('attackValue').textContent=data.attack;
+  document.getElementById('defenseValue').textContent=data.defense;
+  document.getElementById('speedValue').textContent=data.speed;
+});
 
-    <div class="stat-row"><span>⚔️ Ataque:</span><span id="attackValue">0</span></div>
-    <div class="stat-row"><span>🛡️ Defesa:</span><span id="defenseValue">0</span></div>
-    <div class="stat-row"><span>⚡ Velocidade:</span><span id="speedValue">0</span></div>
-  </div>
-
-  <script>
-    const { ipcRenderer } = require('electron');
-    const card = document.getElementById('card');
-
-    // Atualiza os valores do card
-    ipcRenderer.on('update-stats', (event, data) => {
-      document.getElementById('pokemonName').textContent = data.name;
-      document.getElementById('pokemonLevel').textContent = `Nível ${data.level}`;
-      document.getElementById('hpBarFill').style.width = `${(data.hp / data.maxHp) * 100}%`;
-      document.getElementById('hpText').textContent = `${data.hp}/${data.maxHp}`;
-      document.getElementById('xpBarFill').style.width = `${(data.xp / (data.level * 100)) * 100}%`;
-      document.getElementById('xpText').textContent = `${data.xp} / ${data.level * 100} XP`;
-      document.getElementById('attackValue').textContent = data.attack;
-      document.getElementById('defenseValue').textContent = data.defense;
-      document.getElementById('speedValue').textContent = data.speed;
-    });
-
-    // Exibir / ocultar suavemente
-    ipcRenderer.on('show-card', () => {
-      card.classList.add('visible');
-    });
-    ipcRenderer.on('hide-card', () => {
-      card.classList.remove('visible');
-    });
-  </script>
+ipcRenderer.on('show-card', ()=>card.classList.add('visible'));
+ipcRenderer.on('hide-card', ()=>card.classList.remove('visible'));
+</script>
 </body>
 </html>

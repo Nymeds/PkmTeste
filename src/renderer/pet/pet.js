@@ -13,8 +13,16 @@ const gravity = 0.5;
 const jumpStrength = -8;
 const bobAmplitude = 8;
 
+const args = process.argv.slice(1);
+const pokemonNameArg = args.find(a => a.startsWith('--pokemonName='));
+const isStarterArg = args.find(a => a.startsWith('--starter='));
+const pokemonName = pokemonNameArg ? pokemonNameArg.split('=')[1] : "Pikachu";
+const isStarter = isStarterArg === "--starter=true";
+
+const id = Math.floor(Math.random() * 100000);
+
 let pokemonData = {
-  name: "Pikachu",
+  name: pokemonName,
   level: 1,
   hp: 100,
   maxHp: 100,
@@ -33,8 +41,9 @@ let isJumping = false;
 let jumpHeight = 0;
 let jumpVelocity = 0;
 let walkTimer = 0;
+let lastSentX = null;
 
-// ======== Fallback se imagem não existir ==========
+// fallback image
 function createFallbackImage() {
   const tempCanvas = document.createElement('canvas');
   tempCanvas.width = 80;
@@ -48,7 +57,6 @@ function createFallbackImage() {
   petImg.src = tempCanvas.toDataURL();
 }
 
-// ======== Atualização de XP e Level ==========
 function updateStats() {
   pokemonData.xp += 1;
   if (pokemonData.xp >= pokemonData.level * 100) {
@@ -59,10 +67,9 @@ function updateStats() {
     pokemonData.attack += 2;
     pokemonData.defense += 2;
   }
-  ipcRenderer.send('update-card', pokemonData);
+  ipcRenderer.send('update-card', id, pokemonData);
 }
 
-// ======== Pulos aleatórios ==========
 function maybeJump() {
   if (!isJumping && Math.random() < 0.02) {
     isJumping = true;
@@ -70,7 +77,6 @@ function maybeJump() {
   }
 }
 
-// ======== Física do pulo ==========
 function updateJump() {
   if (isJumping) {
     jumpVelocity += gravity;
@@ -82,7 +88,14 @@ function updateJump() {
   }
 }
 
-// ======== Loop de animação ==========
+function sendWindowMoveIfNeeded(xToSend) {
+  const xi = Math.floor(xToSend);
+  if (lastSentX === null || xi !== lastSentX) {
+    lastSentX = xi;
+    ipcRenderer.send('move-window', id, xi);
+  }
+}
+
 function animate() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -94,7 +107,7 @@ function animate() {
     if (windowX > screenWidth - 120) direction = -1;
     else if (windowX < 0) direction = 1;
 
-    ipcRenderer.send('move-window', Math.floor(windowX));
+    sendWindowMoveIfNeeded(windowX);
   }
 
   updateJump();
@@ -112,20 +125,22 @@ function animate() {
   requestAnimationFrame(animate);
 }
 
-// ======== Hover Events (mostrar / ocultar card) ==========
+// Hover events
 const hoverZone = document.getElementById('hoverZone');
-hoverZone.addEventListener('mouseenter', () => ipcRenderer.send('show-card'));
-hoverZone.addEventListener('mouseleave', () => ipcRenderer.send('hide-card'));
+hoverZone.addEventListener('mouseenter', () => ipcRenderer.send('show-card', id));
+hoverZone.addEventListener('mouseleave', () => ipcRenderer.send('hide-card', id));
 
-// XP aumenta a cada 3 segundos
+// XP aumenta a cada 3s
 setInterval(updateStats, 3000);
 
-// ======== Carrega imagem do pet ==========
-const imagePath = path.join(__dirname, '../../../pokedex/pikachu/pikachu.png');
+// load image
+const imagePath = path.join(__dirname, `../../../pokedex/${pokemonName.toLowerCase()}/${pokemonName.toLowerCase()}.png`);
 if (fs.existsSync(imagePath)) petImg.src = imagePath;
 else createFallbackImage();
 
 petImg.onload = () => {
   windowX = Math.random() * (screenWidth - 120);
+  sendWindowMoveIfNeeded(windowX);
+  ipcRenderer.send('update-card', id, pokemonData);
   animate();
 };
