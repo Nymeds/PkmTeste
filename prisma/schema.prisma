@@ -1,0 +1,55 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./pokemon.db"
+}
+
+model Pet {
+  id            String   @id @default(uuid())
+  pokemonId     String   // referência ao ID na pokédex (ex: "pikachu")
+  nickname      String?
+  level         Int      @default(1)
+  experience    Int      @default(0)
+  currentHp     Int
+  maxHp         Int
+  attack        Int
+  defense       Int
+  speed         Int
+  isStarter     Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  positionX     Float    @default(0)
+  positionY     Float    @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastXpGain    DateTime @default(now())
+  
+  @@index([isActive])
+  @@index([pokemonId])
+}
+
+model GameState {
+  id                String   @id @default("main")
+  hasChosenStarter  Boolean  @default(false)
+  starterPetId      String?
+  totalPlayTime     Int      @default(0) // em segundos
+  lastPlayed        DateTime @default(now())
+  
+  @@unique([id])
+}
+
+model Encounter {
+  id          String   @id @default(uuid())
+  petId1      String
+  petId2      String
+  result      String   // "win", "lose", "flee"
+  xpGained    Int
+  timestamp   DateTime @default(now())
+  
+  @@index([petId1])
+  @@index([timestamp])
+}

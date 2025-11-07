@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Pokémon Pet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            background: transparent;
+            overflow: hidden;
+        }
+        #pet-img {
+            width: 100px;
+            height: 100px;
+            pointer-events: auto;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        #pet-img:hover {
+            transform: scale(1.08);
+        }
+        #pet-card {
+            position: absolute;
+            left: 110px;
+            top: 0;
+            z-index: 10;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <img id="pet-img" src="" alt="Pet">
+    <div id="pet-card"></div>
+    <script type="module">
+        import PetCard from '../components/PetCard.jsx';
+
+        let petData = null;
+        let pokemonData = null;
+        let cardVisible = false;
+
+        // Recebe dados do pet
+        window.electronAPI.onPetData(async (data) => {
+            petData = data;
+            await loadPokemonData();
+            renderPet();
+        });
+
+        window.electronAPI.onPetUpdate(async (data) => {
+            petData = data;
+            renderPet();
+        });
+
+        window.electronAPI.onToggleCard((show) => {
+            cardVisible = show;
+            renderCard();
+        });
+
+        async function loadPokemonData() {
+            // Busca dados do Pokémon
+            const res = await window.electronAPI.getStarters();
+            pokemonData = res.find(p => p.id === petData.pokemonId);
+        }
+
+        function renderPet() {
+            const img = document.getElementById('pet-img');
+            img.src = pokemonData.imageUrl;
+            img.alt = pokemonData.name;
+        }
+
+        function renderCard() {
+            const card = document.getElementById('pet-card');
+            if (cardVisible && petData && pokemonData) {
+                // Renderiza o card usando React (simplificado)
+                card.style.display = 'block';
+                card.innerHTML = `
+                    <div class="bg-slate-900 text-white rounded-lg p-4 shadow-xl w-64">
+                        <h3 class="font-bold text-lg">${petData.nickname || pokemonData.name}</h3>
+                        <p>Nível: ${petData.level}</p>
+                        <p>XP: ${petData.experience}</p>
+                        <p>HP: ${petData.currentHp}/${petData.maxHp}</p>
+                        <p>ATK: ${petData.attack}</p>
+                    </div>
+                `;
+            } else {
+                card.style.display = 'none';
+            }
+        }
+
+        // Hover para mostrar/esconder card
+        document.getElementById('pet-img').addEventListener('mouseenter', () => {
+            window.electronAPI.toggleCard({ petId: petData.id, show: true });
+        });
+        document.getElementById('pet-img').addEventListener('mouseleave', () => {
+            window.electronAPI.toggleCard({ petId: petData.id, show: false });
+        });
+    </script>
+</body>
+</html>

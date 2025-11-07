@@ -1,0 +1,14 @@
+{
+    "id": "pikachu",
+    "name": "Pikachu",
+    "baseStats": {
+      "hp": 35,
+      "attack": 55,
+      "defense": 40,
+      "speed": 90
+    },
+    "growthRate": "medium",
+    "type": ["electric"],
+    "description": "Este Pokémon elétrico possui bochechas que soltam faíscas!",
+    "rarity": "starter"
+  }

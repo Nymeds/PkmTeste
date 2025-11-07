@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Escolha seu Inicial - Pokémon Desktop Pet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .pokemon-card {
+            transition: all 0.3s ease;
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        .pokemon-card:hover {
+            transform: scale(1.05) translateY(-5px);
+            animation: none;
+        }
+        
+        .pokemon-card:nth-child(2) { animation-delay: 0.5s; }
+        .pokemon-card:nth-child(3) { animation-delay: 1s; }
+        .pokemon-card:nth-child(4) { animation-delay: 1.5s; }
+        .pokemon-card:nth-child(5) { animation-delay: 2s; }
+        
+        .selected {
+            box-shadow: 0 0 30px rgba(59, 130, 246, 0.8);
+            border-color: #3b82f6;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-8">
+    <div class="max-w-6xl w-full">
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-6xl font-bold text-white mb-4 drop-shadow-lg">
+                Pokémon Desktop Pet
+            </h1>
+            <p class="text-2xl text-white/90 drop-shadow">
+                Escolha seu Pokémon inicial
+            </p>
+        </div>
+
+        <!-- Grid de Pokémon -->
+        <div id="pokemon-grid" class="grid grid-cols-5 gap-6 mb-8">
+            <!-- Será preenchido dinamicamente -->
+        </div>
+
+        <!-- Botão de Confirmação -->
+        <div class="text-center">
+            <button 
+                id="confirm-btn"
+                disabled
+                class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-500 disabled:cursor-not-allowed text-white font-bold text-xl px-12 py-4 rounded-full shadow-lg transform transition hover:scale-105 disabled:hover:scale-100"
+            >
+                Confirmar Escolha
+            </button>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" class="hidden text-center mt-8">
+            <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent"></div>
+            <p class="text-white mt-4 text-lg">Preparando seu Pokémon...</p>
+        </div>
+    </div>
+
+    <script>
+        let selectedPokemon = null;
+        let starters = [];
+
+        // Carrega os iniciais disponíveis
+        async function loadStarters() {
+            try {
+                starters = await window.electronAPI.getStarters();
+                renderPokemon();
+            } catch (error) {
+                console.error('Erro ao carregar iniciais:', error);
+                alert('Erro ao carregar Pokémon. Verifique os arquivos da Pokédex.');
+            }
+        }
+
+        // Renderiza os cards de Pokémon
+        function renderPokemon() {
+            const grid = document.getElementById('pokemon-grid');
+            grid.innerHTML = '';
+
+            starters.forEach(pokemon => {
+                const card = createPokemonCard(pokemon);
+                grid.appendChild(card);
+            });
+        }
+
+        // Cria card individual
+        function createPokemonCard(pokemon) {
+            const card = document.createElement('div');
+            card.className = 'pokemon-card bg-white rounded-2xl p-6 shadow-xl cursor-pointer border-4 border-transparent';
+            card.dataset.pokemonId = pokemon.id;
+
+            // Cores por tipo
+            const typeColors = {
+                electric: 'bg-yellow-400',
+                fire: 'bg-red-500',
+                water: 'bg-blue-500',
+                grass: 'bg-green-500',
+                poison: 'bg-purple-500',
+                dragon: 'bg-indigo-600',
+                flying: 'bg-cyan-400'
+            };
+
+            const typeColor = typeColors[pokemon.type[0]] || 'bg-gray-400';
+
+            card.innerHTML = `
+                <div class="text-center">
+                    <!-- Imagem do Pokémon -->
+                    <div class="w-32 h-32 mx-auto mb-4 relative">
+                        <img 
+                            src="${pokemon.imageUrl}" 
+                            alt="${pokemon.name}"
+                            class="w-full h-full object-contain drop-shadow-lg"
+                            onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22><rect fill=%22%23ddd%22 width=%22100%22 height=%22100%22/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22 font-size=%2214%22>${pokemon.name[0]}</text></svg>'"
+                        >
+                    </div>
+                    
+                    <!-- Nome -->
+                    <h3 class="text-2xl font-bold text-gray-800 mb-2">${pokemon.name}</h3>
+                    
+                    <!-- Tipos -->
+                    <div class="flex gap-2 justify-center mb-4">
+                        ${pokemon.type.map(type => `
+                            <span class="${typeColors[type] || 'bg-gray-400'} text-white text-xs font-bold px-3 py-1 rounded-full uppercase">
+                                ${type}
+                            </span>
+                        `).join('')}
+                    </div>
+                    
+                    <!-- Stats -->
+                    <div class="grid grid-cols-2 gap-2 text-sm">
+                        <div class="bg-red-100 rounded p-2">
+                            <div class="text-gray-600 text-xs">HP</div>
+                            <div class="font-bold text-red-600">${pokemon.baseStats.hp}</div>
+                        </div>
+                        <div class="bg-orange-100 rounded p-2">
+                            <div class="text-gray-600 text-xs">ATK</div>
+                            <div class="font-bold text-orange-600">${pokemon.baseStats.attack}</div>
+                        </div>
+                        <div class="bg-blue-100 rounded p-2">
+                            <div class="text-gray-600 text-xs">DEF</div>
+                            <div class="font-bold text-blue-600">${pokemon.baseStats.defense}</div>
+                        </div>
+                        <div class="bg-yellow-100 rounded p-2">
+                            <div class="text-gray-600 text-xs">SPD</div>
+                            <div class="font-bold text-yellow-600">${pokemon.baseStats.speed}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            card.addEventListener('click', () => selectPokemon(pokemon.id));
+
+            return card;
+        }
+
+        // Seleciona um Pokémon
+        function selectPokemon(pokemonId) {
+            selectedPokemon = pokemonId;
+
+            // Remove seleção anterior
+            document.querySelectorAll('.pokemon-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+
+            // Adiciona seleção no card clicado
+            const selectedCard = document.querySelector(`[data-pokemon-id="${pokemonId}"]`);
+            if (selectedCard) {
+                selectedCard.classList.add('selected');
+            }
+
+            // Habilita botão
+            document.getElementById('confirm-btn').disabled = false;
+        }
+
+        // Confirma escolha
+        async function confirmChoice() {
+            if (!selectedPokemon) return;
+
+            const btn = document.getElementById('confirm-btn');
+            const loading = document.getElementById('loading');
+            
+            btn.disabled = true;
+            loading.classList.remove('hidden');
+
+            try {
+                const result = await window.electronAPI.chooseStarter(selectedPokemon);
+                
+                if (result.success) {
+                    // Fecha a janela após 1 segundo
+                    setTimeout(() => {
+                        window.close();
+                    }, 1000);
+                } else {
+                    alert('Erro ao escolher Pokémon: ' + result.error);
+                    btn.disabled = false;
+                    loading.classList.add('hidden');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao processar escolha');
+                btn.disabled = false;
+                loading.classList.add('hidden');
+            }
+        }
+
+        // Event listeners
+        document.getElementById('confirm-btn').addEventListener('click', confirmChoice);
+
+        // Inicializa
+        loadStarters();
+    </script>
+</body>
+</html>
