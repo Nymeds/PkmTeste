@@ -30,9 +30,11 @@ function createPet(id, name, isStarter) {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-      additionalArguments: [`--pokemonName=${name}`, `--starter=${isStarter}`],
+      // agora incluímos o petId que vem do main
+      additionalArguments: [`--pokemonName=${name}`, `--starter=${isStarter}`, `--petId=${id}`],
     },
   });
+
   petWin.loadFile(path.join(__dirname, '../renderer/pet/pet.html'));
   petWin.setMenu(null);
 
@@ -116,6 +118,7 @@ ipcMain.on('update-card', (event, id, data) => {
 
 // substitua o handler antigo por este
 ipcMain.on('move-window', (event, id, newX, jumpHeight) => {
+    console.log('move-window received:', { id, newX, jumpHeight });
     const pet = pets.find(p => p.id === id);
     if (!pet) return;
   

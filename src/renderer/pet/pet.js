@@ -16,10 +16,13 @@ const bobAmplitude = 8;
 const args = process.argv.slice(1);
 const pokemonNameArg = args.find(a => a.startsWith('--pokemonName='));
 const isStarterArg = args.find(a => a.startsWith('--starter='));
-const pokemonName = pokemonNameArg ? pokemonNameArg.split('=')[1] : "Pikachu";
+const petIdArg = args.find(a => a.startsWith('--petId='));
+
+const pokemonName = pokemonNameArg ? decodeURIComponent(pokemonNameArg.split('=')[1]) : "Pikachu";
 const isStarter = isStarterArg === "--starter=true";
 
-const id = Math.floor(Math.random() * 100000);
+// usa o petId que veio do main, se existir; senão gera um fallback random
+const id = petIdArg ? Number(petIdArg.split('=')[1]) : Math.floor(Math.random() * 100000);
 
 let pokemonData = {
   name: pokemonName,
