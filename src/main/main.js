@@ -27,14 +27,15 @@ function createPet(id, name, isStarter) {
     hasShadow: false,
     resizable: false,
     skipTaskbar: true,
+    acceptFirstMouse: true, // ← importante para cliques imediatos
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-      // agora incluímos o petId que vem do main
+      backgroundThrottling: false, // garante animação continua
       additionalArguments: [`--pokemonName=${name}`, `--starter=${isStarter}`, `--petId=${id}`],
     },
   });
-
+  
   petWin.loadFile(path.join(__dirname, '../renderer/pet/pet.html'));
   petWin.setMenu(null);
 
@@ -252,4 +253,47 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+// ===================
+// Captura de Pokémon
+// ===================
+ipcMain.on('capture-success', async (event, petId, pokemonData) => {
+    try {
+        console.log(`[Capture] Pokémon capturado: ${pokemonData.name} (ID do pet: ${petId})`);
+
+        // Salva o Pokémon no banco
+        const capturedPokemon = await prisma.pokemon.create({
+            data: {
+                name: pokemonData.name,
+                hp: pokemonData.hp,
+                maxHp: pokemonData.maxHp,
+                attack: pokemonData.attack,
+                defense: pokemonData.defense,
+                speed: pokemonData.speed,
+                isStarter: false
+            }
+        });
+
+        // Procura primeiro slot vazio na equipe (1 a 6)
+        for (let slot = 1; slot <= 6; slot++) {
+            const existing = await prisma.teamSlot.findFirst({ where: { slot } });
+            if (!existing) {
+                await prisma.teamSlot.create({
+                    data: { slot, pokemonId: capturedPokemon.id }
+                });
+                console.log(`[Capture] Pokémon ${pokemonData.name} adicionado ao slot ${slot}`);
+                break;
+            }
+        }
+
+        // Fecha a janela do pet
+        const pet = pets.find(p => p.id === petId);
+        if (pet) {
+            pet.petWin.close();
+            pet.cardWin.close();
+            pets = pets.filter(p => p.id !== petId);
+        }
+    } catch (err) {
+        console.error('[Capture] Erro ao capturar Pokémon:', err);
+    }
 });
