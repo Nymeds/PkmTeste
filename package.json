@@ -1,10 +1,20 @@
 {
-  "name": "desktop-pet",
+  "name": "pokemon-desktop-pet",
   "version": "1.0.0",
+  "description": "Um Pokémon que fica andando na barra inferior do Windows",
   "main": "src/main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "dev": "electron . --inspect"
   },
+  "keywords": [
+    "electron",
+    "desktop-pet",
+    "pokemon",
+    "mascot"
+  ],
+  "author": "Seu Nome",
+  "license": "MIT",
   "devDependencies": {
     "electron": "^31.7.7"
   }
