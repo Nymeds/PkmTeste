@@ -7,11 +7,10 @@ datasource db {
   url      = "file:./dev.db"
 }
 
-model Pokemon {
+model TeamPokemon {
   id        Int      @id @default(autoincrement())
-  name      String   // agora pode repetir
-  uniqueId  String   @default(uuid())  // cada Pokémon é único
-  isStarter Boolean  @default(false)
+  uuid      String   @default(uuid()) // cada pokemon é único
+  name      String
   level     Int      @default(1)
   xp        Int      @default(0)
   hp        Int
@@ -19,16 +18,5 @@ model Pokemon {
   attack    Int
   defense   Int
   speed     Int
-  isActive  Boolean  @default(false)
   createdAt DateTime @default(now())
-
-  teamSlots TeamSlot[]
-}
-
-
-model TeamSlot {
-  id        Int      @id @default(autoincrement())
-  slot      Int
-  pokemonId Int
-  pokemon   Pokemon  @relation(fields: [pokemonId], references: [id])
 }

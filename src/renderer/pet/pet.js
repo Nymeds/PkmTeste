@@ -168,12 +168,167 @@ hoverZone.addEventListener('mouseenter', () => { ipcRenderer.send('show-card', i
 hoverZone.addEventListener('mouseleave', () => ipcRenderer.send('hide-card', id));
 
 // click captura
+// click captura
 hoverZone.addEventListener('click', (e) => {
   e.preventDefault(); e.stopPropagation();
   if(!isCapturable || isBeingCaptured) return;
   isBeingCaptured = true;
+
+  // chama a sequência de arremesso (definida abaixo)
   startThrowSequence();
 });
+if(isCapturable) hoverZone.style.cursor = 'pointer';
+
+// ----------------- captura: arremesso, shake, sucesso/fuga -----------------
+function startThrowSequence(){
+  // pausa movimento local
+  walkState = 'idle';
+  isJumping = false;
+  vy = 0;
+  yOffset = 0;
+
+  const startX = canvas.width/2;
+  const startY = canvas.height + 30;
+  const targetX = canvas.width/2;
+  let t = 0;
+  const duration = 40;
+  const shakeCount = 3;
+
+  function animateThrow(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    drawPokemon();
+    const p = t / duration;
+    const arc = Math.sin(p * Math.PI);
+    const currentX = startX + (targetX - startX) * p;
+    const currentY = startY - 50 * arc;
+    ctx.save();
+    ctx.translate(currentX, currentY);
+    ctx.rotate(p * Math.PI * 3);
+    if (pokeballLoaded) ctx.drawImage(pokeballImg, -15, -15, 30, 30);
+    else {
+      // fallback draw
+      ctx.fillStyle = 'red';
+      ctx.beginPath();
+      ctx.arc(0,0,12,0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+    t++;
+    if(t <= duration) requestAnimationFrame(animateThrow);
+    else shakePokeball(shakeCount, onShakeComplete);
+  }
+  animateThrow();
+
+  async function onShakeComplete(){
+    // cálculo simples de chance (ajuste se quiser)
+    let chance = 0.6;
+    if(pokemonData.level > 1){ chance -= (pokemonData.level - 1) * 0.05; chance = Math.max(0.3, chance); }
+    const caught = Math.random() < chance;
+    if(caught){
+      // animação de sucesso e em seguida pede ao main pra persistir
+      successAnimation(async () => {
+        try {
+          const res = await ipcRenderer.invoke('capture-pokemon', { id, name: pokemonName, pokemonData });
+          if (res && res.success) {
+            // fecha essa janela renderer (o main também fecha a janela via pets array)
+            try { window.close(); } catch(e) {}
+          } else {
+            console.error('capture-pokemon falhou:', res && res.error);
+            // se falhar no main, restaura estado local
+            isBeingCaptured = false;
+            walkState = 'walking';
+          }
+        } catch (err) {
+          console.error('Erro ao invocar capture-pokemon:', err);
+          isBeingCaptured = false;
+          walkState = 'walking';
+        }
+      });
+    } else {
+      // falhou: anima fuga e restaura estado local
+      escapeAnimation(() => {
+        isBeingCaptured = false;
+        walkState = 'walking';
+      });
+    }
+  }
+}
+
+function shakePokeball(times, cb){
+  let shakeT = 0;
+  const shakeDuration = 20;
+  function doShake(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    drawPokemon();
+    const offset = 5 * Math.sin((shakeT / shakeDuration) * Math.PI * 2);
+    if (pokeballLoaded) ctx.drawImage(pokeballImg, canvas.width/2 - 15 + offset, canvas.height/2 - 15, 30, 30);
+    else {
+      ctx.fillStyle = 'red';
+      ctx.beginPath();
+      ctx.arc(canvas.width/2 + offset, canvas.height/2, 12, 0, Math.PI*2);
+      ctx.fill();
+    }
+    shakeT++;
+    if(shakeT <= shakeDuration) requestAnimationFrame(doShake);
+    else if(times > 1){ shakePokeball(times-1, cb); }
+    else cb();
+  }
+  doShake();
+}
+
+function successAnimation(cb){
+  let frame = 0;
+  const dur = 30;
+  function run(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    if(frame < dur){
+      const scale = 1 + Math.sin(frame * 0.3) * 0.1;
+      ctx.save(); ctx.translate(canvas.width/2, canvas.height/2); ctx.scale(scale, scale);
+      if (pokeballLoaded) ctx.drawImage(pokeballImg, -15, -15, 30, 30);
+      else { ctx.fillStyle='red'; ctx.beginPath(); ctx.arc(0,0,12,0,Math.PI*2); ctx.fill(); }
+      ctx.restore();
+      // simples partículas
+      for(let i=0;i<4;i++){
+        const a = (frame*0.1) + (i * Math.PI*2/4);
+        const r = 20 + Math.sin(frame*0.2)*6;
+        const sx = canvas.width/2 + Math.cos(a)*r;
+        const sy = canvas.height/2 + Math.sin(a)*r;
+        ctx.fillStyle = `rgba(255,255,0,${1 - frame/dur})`;
+        ctx.fillRect(sx-2, sy-2, 4, 4);
+      }
+      frame++; requestAnimationFrame(run);
+    } else cb();
+  }
+  run();
+}
+
+function escapeAnimation(cb){
+  let f = 0;
+  const dur = 15;
+  function run(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    if(f < dur){
+      ctx.save(); ctx.globalAlpha = 1 - (f/dur);
+      ctx.translate(canvas.width/2, canvas.height/2);
+      ctx.scale(1 + f*0.08, 1 + f*0.08);
+      if (pokeballLoaded) ctx.drawImage(pokeballImg, -15, -15, 30, 30);
+      else { ctx.fillStyle='red'; ctx.beginPath(); ctx.arc(0,0,12,0,Math.PI*2); ctx.fill(); }
+      ctx.restore();
+      for(let i=0;i<6;i++){
+        const ang = (i * Math.PI*2/6) + (f*0.2);
+        const dist = f * 3;
+        const px = canvas.width/2 + Math.cos(ang) * dist;
+        const py = canvas.height/2 + Math.sin(ang) * dist;
+        ctx.fillStyle = `rgba(255,200,0,${1 - f/dur})`;
+        ctx.fillRect(px-2, py-2, 4, 4);
+      }
+      drawPokemon();
+      f++; requestAnimationFrame(run);
+    } else cb();
+  }
+  run();
+}
+
 if(isCapturable) hoverZone.style.cursor = 'pointer';
 
 // desenho
