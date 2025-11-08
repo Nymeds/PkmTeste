@@ -1,53 +1,30 @@
-// src/renderer/pet/pet.js
-const { ipcRenderer } = require('electron');
-const path = require('path');
-const fs = require('fs');
-
-const canvas = document.getElementById("petCanvas");
-const ctx = canvas.getContext("2d");
-canvas.width = 120;
-canvas.height = 120;
-
-const hoverZone = document.getElementById('hoverZone');
-
-const screenWidth = 1920;
-const speedBase = 1.2;
-
-// Física vertical
-const GRAVITY = 0.3;       // gravidade positiva (puxa para baixo)
-const JUMP_VELOCITY = -4;  // velocidade inicial negativa (sobe)
-const MAX_JUMP = 80;       // altura máxima visual do pulo
-const JUMP_COOLDOWN = 2000; // 2s mínimo entre pulos
-
-// args
+// args parsing (substitui a seção antiga)
 const args = process.argv.slice(1);
-const pokemonNameArg = args.find(a => a.startsWith('--pokemonName='));
-const isStarterArg = args.find(a => a.startsWith('--starter='));
-const petIdArg = args.find(a => a.startsWith('--petId='));
-const isTeamMemberArg = args.find(a => a.startsWith('--teamMember='));
-const dbIdArg = args.find(a => a.startsWith('--dbId='));
+function argVal(name) {
+  const a = args.find(x => x.startsWith('--' + name + '='));
+  if (!a) return null;
+  return decodeURIComponent(a.split('=')[1]);
+}
+const pokemonName = argVal('pokemonName') || 'Pikachu';
+const isStarter = argVal('starter') === 'true';
+const isTeamMember = argVal('teamMember') === 'true';
+const id = Number(argVal('petId')) || Math.floor(Math.random() * 100000);
+const dbId = argVal('dbId') ? Number(argVal('dbId')) : null;
 
-const pokemonName = pokemonNameArg ? decodeURIComponent(pokemonNameArg.split('=')[1]) : "Pikachu";
-const isStarter = isStarterArg === "--starter=true";
-const isTeamMember = isTeamMemberArg === "--teamMember=true";
-const id = petIdArg ? Number(petIdArg.split('=')[1]) : Math.floor(Math.random() * 100000);
-const dbId = dbIdArg ? (dbIdArg.split('=')[1] || null) : null;
+const pokemonData = {
+  id: dbId || null,
+  name: pokemonName,
+  level: Number(argVal('level')) || 1,
+  hp: Number(argVal('hp')) || 100,
+  maxHp: Number(argVal('maxHp')) || 100,
+  xp: Number(argVal('xp')) || 0,
+  attack: Number(argVal('attack')) || 10,
+  defense: Number(argVal('defense')) || 8,
+  speed: Number(argVal('speed')) || 12
+};
+
 const isFree = !isStarter && !isTeamMember;
 
-console.log(`[Pet ${id}] ${pokemonName} starter=${isStarter} team=${isTeamMember} free=${isFree} dbId=${dbId}`);
-
-// pokemon data
-let pokemonData = {
-  id: dbId ? Number(dbId) : null,
-  name: pokemonName,
-  level: 1,
-  hp: 100,
-  maxHp: 100,
-  xp: 0,
-  attack: 10,
-  defense: 8,
-  speed: 12
-};
 
 // imagens
 let petImg = new Image();
