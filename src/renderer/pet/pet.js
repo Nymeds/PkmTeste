@@ -74,6 +74,10 @@ let walkDuration = getRandomDuration(2000, 5000);
 let idleDuration = getRandomDuration(1000, 3000);
 let stateTimer = 0;
 
+// Para membros do time: range de seguimento
+const FOLLOW_RANGE = 80; // distância máxima permitida do líder
+const CATCH_UP_SPEED = 2.5; // velocidade quando muito longe
+
 // captura flags
 let isCapturable = isFree;
 let isBeingCaptured = false;
@@ -193,17 +197,53 @@ function animate(){
       }
       window.postMessage({ type:'leader-state', state:{ walkState, direction, windowX } }, '*');
     } else if (isTeamMember) {
-      // follow leader
-      walkState = leaderState.walkState;
-      direction = leaderState.direction;
+      // follow leader com movimento próprio
       const slot = id - 1000;
-      const targetX = leaderState.windowX - slot * 60;
-      const diff = targetX - windowX;
-      if(Math.abs(diff) > 1) windowX += Math.sign(diff) * speedBase * 0.9;
-      if(!isJumping && Math.random() < 0.01) maybeJump();
-      updateJump();
+      const offset = slot * 60 - 60;
+      const targetX = leaderState.windowX - offset;
+      const distance = Math.abs(targetX - windowX);
+      
+      // Se muito longe, corre para alcançar
+      if(distance > FOLLOW_RANGE) {
+        const catchUpDir = Math.sign(targetX - windowX);
+        windowX += CATCH_UP_SPEED * catchUpDir;
+        direction = catchUpDir;
+        walkState = 'walking';
+      } else {
+        // Movimento independente dentro do range
+        if(walkState === 'walking'){
+          const moveX = windowX + (speedBase * direction);
+          // Verifica se ainda está no range permitido
+          if(Math.abs(moveX - targetX) <= FOLLOW_RANGE) {
+            windowX = moveX;
+          } else {
+            // Inverte direção se atingir limite
+            direction *= -1;
+          }
+          
+          walkTimer++;
+          maybeJump(); updateJump();
+          
+          if(stateTimer >= walkDuration/16){ 
+            walkState='idle'; 
+            stateTimer=0; 
+            idleDuration=getRandomDuration(1000,3000); 
+          }
+        } else {
+          // idle
+          walkTimer++;
+          jumpHeight = 0;
+          if(stateTimer >= idleDuration/16){ 
+            walkState='walking'; 
+            stateTimer=0; 
+            walkDuration=getRandomDuration(2000,5000);
+            // Aleatoriza direção no idle
+            if(Math.random() < 0.3) direction *= -1;
+          }
+        }
+      }
+      
       sendWindowMoveIfNeeded(windowX);
-      walkTimer++;
     } else if (isFree) {
       // free movement
       if(walkState === 'walking'){
@@ -313,7 +353,11 @@ function successAnimation(cb){
         ctx.fillRect(sx-2, sy-2, 4, 4);
       }
       frame++; requestAnimationFrame(run);
-    } else cb();
+    } else {
+      // Animação concluída, fecha janela e notifica
+      animationRunning = false;
+      cb();
+    }
   }
   run();
 }

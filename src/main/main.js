@@ -15,6 +15,8 @@ const MAX_ACTIVE_PETS = 3; // starter + 2 capturados
 // Criar pet (janela + card)
 // ===================
 function createPet(id, name, isStarter, isTeamMember = false) {
+  console.log(`[CreatePet] ID=${id} Name=${name} Starter=${isStarter} Team=${isTeamMember}`);
+  
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   const startX = Math.floor(Math.random() * (width - 120));
 
@@ -66,6 +68,7 @@ function createPet(id, name, isStarter, isTeamMember = false) {
   cardWin.setMenu(null);
 
   pets.push({ id, petWin, cardWin, isStarter, name, isTeamMember });
+  console.log(`[CreatePet] Total de pets ativos: ${pets.length}`);
 }
 
 // ===================
@@ -73,6 +76,8 @@ function createPet(id, name, isStarter, isTeamMember = false) {
 // ===================
 async function spawnFreePokemon() {
   const freeCount = pets.filter(p => !p.isStarter && !p.isTeamMember).length;
+  console.log(`[Spawn] Pokémons livres atuais: ${freeCount} de ${MAX_FREE_POKEMONS}`);
+  
   if (freeCount >= MAX_FREE_POKEMONS) return;
 
   const pokedexPath = path.join(__dirname, '../../pokedex');
@@ -82,11 +87,13 @@ async function spawnFreePokemon() {
   const freePokemonName = allPokemons[Math.floor(Math.random() * allPokemons.length)];
   const id = Date.now() + Math.floor(Math.random() * 1000);
 
+  console.log(`[Spawn] Criando ${freePokemonName} com ID ${id}`);
   createPet(id, freePokemonName, false, false);
 
   setTimeout(() => {
     const pet = pets.find(p => p.id === id);
     if (pet) {
+      console.log(`[Spawn] Removendo ${freePokemonName} (tempo esgotado)`);
       if (!pet.petWin.isDestroyed()) pet.petWin.close();
       if (!pet.cardWin.isDestroyed()) pet.cardWin.close();
       pets = pets.filter(p => p.id !== id);
@@ -175,14 +182,19 @@ ipcMain.on('move-window', (event, id, newX, jumpHeight) => {
 ipcMain.on('capture-success', async (event, petId, pokemonData) => {
   try {
     const pet = pets.find(p => p.id === petId);
-    if (!pet || pet.isTeamMember) return;
+    if (!pet || pet.isTeamMember || pet.isStarter) {
+      console.log('[Capture] Pet não é capturável:', petId);
+      return;
+    }
 
-    // Remove da tela
+    console.log('[Capture] Iniciando captura de:', pokemonData.name);
+
+    // 1. Remove da tela imediatamente
     if (!pet.petWin.isDestroyed()) pet.petWin.close();
     if (!pet.cardWin.isDestroyed()) pet.cardWin.close();
     pets = pets.filter(p => p.id !== petId);
 
-    // Evita duplicidade de name
+    // 2. Salva no banco
     let capturedPokemon;
     try {
       capturedPokemon = await prisma.pokemon.create({
@@ -195,32 +207,51 @@ ipcMain.on('capture-success', async (event, petId, pokemonData) => {
           speed: pokemonData.speed,
           level: pokemonData.level,
           xp: pokemonData.xp,
-          isStarter: false
+          isStarter: false,
+          isActive: false
         }
       });
+      console.log('[Capture] Pokémon salvo no banco:', capturedPokemon.id);
     } catch (err) {
-      if (err.code === 'P2002') { // name duplicado
-        capturedPokemon = await prisma.pokemon.findFirst({ where: { name: pokemonData.name } });
-      } else {
-        throw err;
-      }
+      console.error('[Capture] Erro ao salvar:', err);
+      return;
     }
 
-    // Verifica espaço na tela (starter + membros)
+    // 3. Verifica espaço no time (máximo 3 na tela: starter + 2)
     const activeTeam = pets.filter(p => p.isStarter || p.isTeamMember);
+    console.log('[Capture] Time atual:', activeTeam.length, 'de', MAX_ACTIVE_PETS);
+
     if (activeTeam.length < MAX_ACTIVE_PETS) {
-      for (let slot = 2; slot <= 6; slot++) {
-        const existing = await prisma.teamSlot.findFirst({ where: { slot } });
-        if (!existing) {
-          await prisma.teamSlot.create({ data: { slot, pokemonId: capturedPokemon.id } });
-          const newPetId = 1000 + slot;
-          createPet(newPetId, capturedPokemon.name, false, true);
-          break;
+      // 4. Aguarda 3 segundos antes de spawnar
+      setTimeout(async () => {
+        try {
+          // Procura slot disponível (2-6)
+          for (let slot = 2; slot <= 6; slot++) {
+            const existing = await prisma.teamSlot.findFirst({ where: { slot } });
+            if (!existing) {
+              // Cria slot no banco
+              await prisma.teamSlot.create({ 
+                data: { slot, pokemonId: capturedPokemon.id } 
+              });
+              
+              // Spawna na tela
+              const newPetId = 1000 + slot;
+              createPet(newPetId, capturedPokemon.name, false, true);
+              
+              console.log('[Capture] Pokémon adicionado ao time no slot', slot);
+              break;
+            }
+          }
+        } catch (err) {
+          console.error('[Capture] Erro ao adicionar ao time:', err);
         }
-      }
+      }, 3000);
+    } else {
+      console.log('[Capture] Time cheio. Pokémon salvo na Pokédex.');
     }
+
   } catch (err) {
-    console.error('[Capture] Erro ao capturar Pokémon:', err);
+    console.error('[Capture] Erro geral na captura:', err);
   }
 });
 
