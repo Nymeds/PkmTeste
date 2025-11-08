@@ -1,3 +1,4 @@
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,9 +8,10 @@ datasource db {
   url      = "file:./dev.db"
 }
 
-model TeamPokemon {
+// Pokémon capturado (inventário geral)
+model Pokemon {
   id        Int      @id @default(autoincrement())
-  uuid      String   @default(uuid()) // cada pokemon é único
+  uuid      String   @unique @default(uuid())
   name      String
   level     Int      @default(1)
   xp        Int      @default(0)
@@ -19,4 +21,25 @@ model TeamPokemon {
   defense   Int
   speed     Int
   createdAt DateTime @default(now())
+  
+  // Relação com slot do time (opcional)
+  teamSlot  TeamSlot?
+}
+
+// Slot do time (máximo 6, apenas 3 renderizados)
+model TeamSlot {
+  id         Int     @id @default(autoincrement())
+  slotNumber Int     @unique // 1-6
+  pokemonId  Int     @unique
+  pokemon    Pokemon @relation(fields: [pokemonId], references: [id], onDelete: Cascade)
+  
+  @@index([slotNumber])
+}
+
+// Estado do jogo (singleton)
+model GameState {
+  id              Int      @id @default(autoincrement())
+  starterChosen   Boolean  @default(false)
+  starterPokemon  String?
+  lastPlayed      DateTime @default(now())
 }
