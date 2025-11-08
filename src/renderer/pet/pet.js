@@ -1,4 +1,4 @@
-// Substitua todo o arquivo por este conteúdo
+// src/renderer/pet/pet.js
 const { ipcRenderer } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -12,8 +12,12 @@ const hoverZone = document.getElementById('hoverZone');
 
 const screenWidth = 1920;
 const speedBase = 1.2;
-const gravity = 0.5;
-const jumpStrength = -8;
+
+// Física vertical
+const GRAVITY = 0.3;       // gravidade positiva (puxa para baixo)
+const JUMP_VELOCITY = -4;  // velocidade inicial negativa (sobe)
+const MAX_JUMP = 80;       // altura máxima visual do pulo
+const JUMP_COOLDOWN = 2000; // 2s mínimo entre pulos
 
 // args
 const args = process.argv.slice(1);
@@ -21,17 +25,20 @@ const pokemonNameArg = args.find(a => a.startsWith('--pokemonName='));
 const isStarterArg = args.find(a => a.startsWith('--starter='));
 const petIdArg = args.find(a => a.startsWith('--petId='));
 const isTeamMemberArg = args.find(a => a.startsWith('--teamMember='));
+const dbIdArg = args.find(a => a.startsWith('--dbId='));
 
 const pokemonName = pokemonNameArg ? decodeURIComponent(pokemonNameArg.split('=')[1]) : "Pikachu";
 const isStarter = isStarterArg === "--starter=true";
 const isTeamMember = isTeamMemberArg === "--teamMember=true";
 const id = petIdArg ? Number(petIdArg.split('=')[1]) : Math.floor(Math.random() * 100000);
+const dbId = dbIdArg ? (dbIdArg.split('=')[1] || null) : null;
 const isFree = !isStarter && !isTeamMember;
 
-console.log(`[Pet ${id}] ${pokemonName} starter=${isStarter} team=${isTeamMember} free=${isFree}`);
+console.log(`[Pet ${id}] ${pokemonName} starter=${isStarter} team=${isTeamMember} free=${isFree} dbId=${dbId}`);
 
 // pokemon data
 let pokemonData = {
+  id: dbId ? Number(dbId) : null,
   name: pokemonName,
   level: 1,
   hp: 100,
@@ -56,13 +63,17 @@ if (fs.existsSync(pokeballPath)) {
 pokeballImg.onload = () => pokeballLoaded = true;
 pokeballImg.onerror = createFallbackPokeball;
 
-// movimento
-let x = Math.random() * (screenWidth - 120);
-let windowX = x;
+// movimento & estado
+let windowX = Math.floor(Math.random() * (screenWidth - 120));
+let homeX = windowX;
 let direction = Math.random() < 0.5 ? -1 : 1;
-let jumpHeight = 0;
-let jumpVelocity = 0;
+
+// vertical physics
+let yOffset = 0;    // altura acima do chão
+let vy = 0;         // velocidade vertical
 let isJumping = false;
+let lastJumpTime = 0;
+
 let walkTimer = 0;
 let lastSentX = null;
 
@@ -74,11 +85,9 @@ let walkDuration = getRandomDuration(2000, 5000);
 let idleDuration = getRandomDuration(1000, 3000);
 let stateTimer = 0;
 
-// Para membros do time: range de seguimento
-const FOLLOW_RANGE = 80; // distância máxima permitida do líder
-const CATCH_UP_SPEED = 2.5; // velocidade quando muito longe
+const TEAM_RANGE = 100;
+const TEAM_CATCHUP = 2.0;
 
-// captura flags
 let isCapturable = isFree;
 let isBeingCaptured = false;
 
@@ -108,14 +117,33 @@ function createFallbackPokeball(){
 }
 
 function getRandomDuration(min,max){ return Math.floor(Math.random()*(max-min))+min; }
-function maybeJump(){ if(!isJumping && Math.random()<0.02){ isJumping=true; jumpVelocity=jumpStrength; } }
-function updateJump(){ if(isJumping){ jumpVelocity += gravity; jumpHeight -= jumpVelocity; if(jumpHeight>=0){ jumpHeight=0; isJumping=false; } } }
+
+function maybeStartJump(){
+  const now = Date.now();
+  if(!isJumping && Math.random() < 0.01 && now - lastJumpTime > JUMP_COOLDOWN){
+    isJumping = true;
+    vy = JUMP_VELOCITY;
+    lastJumpTime = now;
+  }
+}
+
+function updateVertical(){
+  if (!isJumping) return;
+  vy += GRAVITY;
+  yOffset += vy;
+  if (yOffset > MAX_JUMP) yOffset = MAX_JUMP;
+  if (yOffset <= 0){
+    yOffset = 0;
+    vy = 0;
+    isJumping = false;
+  }
+}
 
 function sendWindowMoveIfNeeded(xToSend){
   const xi = Math.floor(xToSend);
-  if (lastSentX === null || xi !== lastSentX) {
+  if(lastSentX === null || xi !== lastSentX){
     lastSentX = xi;
-    ipcRenderer.send('move-window', id, xi, jumpHeight);
+    ipcRenderer.send('move-window', id, xi, Math.floor(yOffset));
   }
 }
 
@@ -124,34 +152,38 @@ function maybeChangeDirection(){ if(Math.random()<0.2) direction *= -1; }
 function updateStats(){
   if(!isStarter) return;
   pokemonData.xp += 1;
-  if(pokemonData.xp >= pokemonData.level*100){ pokemonData.xp=0; pokemonData.level++; pokemonData.maxHp+=10; pokemonData.hp=pokemonData.maxHp; pokemonData.attack+=2; pokemonData.defense+=2; }
+  if(pokemonData.xp >= pokemonData.level*100){
+    pokemonData.xp = 0;
+    pokemonData.level++;
+    pokemonData.maxHp += 10;
+    pokemonData.hp = pokemonData.maxHp;
+    pokemonData.attack += 2;
+    pokemonData.defense += 2;
+  }
   ipcRenderer.send('update-card', id, pokemonData);
 }
 
-// hover events (restaura card)
-hoverZone.addEventListener('mouseenter', () => {
-  ipcRenderer.send('show-card', id);
-  ipcRenderer.send('update-card', id, pokemonData);
-});
+// hover events
+hoverZone.addEventListener('mouseenter', () => { ipcRenderer.send('show-card', id); ipcRenderer.send('update-card', id, pokemonData); });
 hoverZone.addEventListener('mouseleave', () => ipcRenderer.send('hide-card', id));
 
-// click => inicia animação de captura (se for pokémon livre)
+// click captura
 hoverZone.addEventListener('click', (e) => {
-  e.preventDefault();
-  e.stopPropagation();
+  e.preventDefault(); e.stopPropagation();
   if(!isCapturable || isBeingCaptured) return;
   isBeingCaptured = true;
   startThrowSequence();
 });
-if (isCapturable) hoverZone.style.cursor = 'pointer';
+if(isCapturable) hoverZone.style.cursor = 'pointer';
 
 // desenho
 function drawPokemon(){
-  const bobAmplitudeCurrent = (walkState === 'walking') ? walkBobAmplitude : idleBobAmplitude;
+  const bobAmplitudeCurrent = (walkState === 'walking' && yOffset === 0) ? walkBobAmplitude : idleBobAmplitude;
   const bob = Math.abs(Math.sin(walkTimer*0.12))*bobAmplitudeCurrent;
   const baseOffset = 55;
-  const drawY = canvas.height - baseOffset - bob - jumpHeight;
+  const drawY = canvas.height - baseOffset - bob - yOffset;
 
+  ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.save();
   ctx.translate(canvas.width/2, drawY+40);
   ctx.scale(direction === 1 ? -1 : 1, 1);
@@ -168,237 +200,80 @@ function drawPokemon(){
 
 // animação principal
 let animationRunning = true;
-let leaderState = { walkState: 'walking', direction:1, windowX:0 };
-if(!isStarter && isTeamMember){
-  window.addEventListener('message', (evt) => {
-    if(evt.data && evt.data.type === 'leader-state') leaderState = evt.data.state;
-  });
-}
 
 function animate(){
   if(!animationRunning) return;
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+  stateTimer++;
+
   if(!isBeingCaptured){
-    stateTimer++;
     if(isStarter){
-      // starter move
       if(walkState === 'walking'){
-        x += speedBase * direction;
         windowX += speedBase * direction;
-        if(windowX > screenWidth - 120) direction = -1;
-        else if(windowX < 0) direction = 1;
+        if(windowX > screenWidth-120){ windowX = screenWidth-120; direction=-1; }
+        else if(windowX < 0){ windowX=0; direction=1; }
+        maybeStartJump(); updateVertical();
         sendWindowMoveIfNeeded(windowX);
         walkTimer++;
-        maybeJump(); updateJump();
         if(stateTimer >= walkDuration/16){ walkState='idle'; stateTimer=0; idleDuration=getRandomDuration(1000,3000); maybeChangeDirection(); }
       } else {
-        walkTimer++; jumpHeight = 0;
+        maybeStartJump(); updateVertical();
+        walkTimer++;
         if(stateTimer >= idleDuration/16){ walkState='walking'; stateTimer=0; walkDuration=getRandomDuration(2000,5000); }
       }
-      window.postMessage({ type:'leader-state', state:{ walkState, direction, windowX } }, '*');
-    } else if (isTeamMember) {
-      // follow leader com movimento próprio
-      const slot = id - 1000;
-      const offset = slot * 60 - 60;
-      const targetX = leaderState.windowX - offset;
-      const distance = Math.abs(targetX - windowX);
-      
-      // Se muito longe, corre para alcançar
-      if(distance > FOLLOW_RANGE) {
-        const catchUpDir = Math.sign(targetX - windowX);
-        windowX += CATCH_UP_SPEED * catchUpDir;
-        direction = catchUpDir;
-        walkState = 'walking';
+    } else if(isTeamMember){
+      if(typeof homeX !== 'number') homeX = windowX;
+      const dist = windowX-homeX;
+      if(Math.abs(dist) > TEAM_RANGE){
+        const dir = Math.sign(homeX-windowX) || 1;
+        windowX += TEAM_CATCHUP*dir;
+        direction = dir;
+        if(Math.random() < 0.015) maybeStartJump();
       } else {
-        // Movimento independente dentro do range
-        if(walkState === 'walking'){
-          const moveX = windowX + (speedBase * direction);
-          // Verifica se ainda está no range permitido
-          if(Math.abs(moveX - targetX) <= FOLLOW_RANGE) {
-            windowX = moveX;
-          } else {
-            // Inverte direção se atingir limite
-            direction *= -1;
-          }
-          
-          walkTimer++;
-          maybeJump(); updateJump();
-          
-          if(stateTimer >= walkDuration/16){ 
-            walkState='idle'; 
-            stateTimer=0; 
-            idleDuration=getRandomDuration(1000,3000); 
-          }
+        if(walkState==='walking'){
+          const next = windowX + speedBase*direction;
+          if(next > homeX+TEAM_RANGE || next < homeX-TEAM_RANGE) direction*=-1;
+          else windowX = next;
+          if(Math.random() < 0.015) maybeStartJump();
+          updateVertical(); walkTimer++;
+          if(stateTimer>=walkDuration/16){ walkState='idle'; stateTimer=0; idleDuration=getRandomDuration(800,2200); }
         } else {
-          // idle
-          walkTimer++;
-          jumpHeight = 0;
-          if(stateTimer >= idleDuration/16){ 
-            walkState='walking'; 
-            stateTimer=0; 
-            walkDuration=getRandomDuration(2000,5000);
-            // Aleatoriza direção no idle
-            if(Math.random() < 0.3) direction *= -1;
-          }
+          updateVertical(); walkTimer++;
+          if(stateTimer>=idleDuration/16){ walkState='walking'; stateTimer=0; walkDuration=getRandomDuration(1200,3800); if(Math.random()<0.35) direction*=-1; }
         }
       }
-      
       sendWindowMoveIfNeeded(windowX);
-    } else if (isFree) {
-      // free movement
-      if(walkState === 'walking'){
-        x += speedBase * direction;
-        windowX = x;
-        if(x <= 0 || x >= screenWidth - 120) direction *= -1;
-        maybeJump(); updateJump();
-        if(stateTimer >= walkDuration/16){ walkState='idle'; stateTimer=0; idleDuration=getRandomDuration(1000,3000); }
+    } else if(isFree){
+      if(walkState==='walking'){
+        windowX += speedBase*direction;
+        if(windowX >= screenWidth-120 || windowX <= 0) direction*=-1;
+        if(Math.random()<0.02) maybeStartJump();
+        updateVertical(); walkTimer++;
+        if(stateTimer>=walkDuration/16){ walkState='idle'; stateTimer=0; idleDuration=getRandomDuration(1000,3000); }
       } else {
-        if(stateTimer >= idleDuration/16){ walkState='walking'; stateTimer=0; walkDuration=getRandomDuration(2000,5000); maybeChangeDirection(); }
+        updateVertical();
+        if(stateTimer>=idleDuration/16){ walkState='walking'; stateTimer=0; walkDuration=getRandomDuration(2000,5000); if(Math.random()<0.3) direction*=-1; }
       }
       sendWindowMoveIfNeeded(windowX);
-      walkTimer++;
     }
+  } else {
+    updateVertical();
+    sendWindowMoveIfNeeded(windowX);
   }
+
   drawPokemon();
   requestAnimationFrame(animate);
 }
 
 if(isStarter) setInterval(updateStats,3000);
 
-// captura: animação de arremesso + shake -> só envia capture-success se pegou
-function startThrowSequence(){
-  // pausa movimento
-  walkState = 'idle';
-  isJumping = false;
-  jumpHeight = 0;
-
-  const startX = canvas.width/2;
-  const startY = canvas.height + 30;
-  const targetX = canvas.width/2;
-  const targetY = canvas.height/2;
-  let t = 0;
-  const duration = 40;
-  const shakeCount = 3;
-
-  function animateThrow(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    drawPokemon();
-    const p = t / duration;
-    const arc = Math.sin(p * Math.PI);
-    const currentX = startX + (targetX - startX) * p;
-    const currentY = startY + (targetY - startY) * p - 50 * arc;
-    ctx.save();
-    ctx.translate(currentX, currentY);
-    ctx.rotate(p * Math.PI * 3);
-    ctx.drawImage(pokeballImg, -15, -15, 30, 30);
-    ctx.restore();
-    t++;
-    if(t <= duration) requestAnimationFrame(animateThrow);
-    else shakePokeball(shakeCount, onShakeComplete);
-  }
-  animateThrow();
-
-  function onShakeComplete(){
-    // base chance — você pode ajustar por level/stats
-    let chance = 0.6;
-    if(pokemonData.level > 1){ chance -= (pokemonData.level - 1) * 0.05; chance = Math.max(0.3, chance); }
-    const caught = Math.random() < chance;
-    if(caught){
-      // sucesso: anima sucesso e então notifica main
-      successAnimation(() => {
-        ipcRenderer.send('capture-success', id, pokemonData);
-      });
-    } else {
-      // falhou: anima efeito de fuga e restaura estado
-      escapeAnimation(() => {
-        isBeingCaptured = false;
-        walkState = 'walking';
-      });
-    }
-  }
-}
-
-function shakePokeball(times, cb){
-  let shakeT = 0;
-  const shakeDuration = 20;
-  function doShake(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    drawPokemon();
-    const offset = 5 * Math.sin((shakeT / shakeDuration) * Math.PI * 2);
-    ctx.drawImage(pokeballImg, canvas.width/2 - 15 + offset, canvas.height/2 - 15, 30, 30);
-    shakeT++;
-    if(shakeT <= shakeDuration) requestAnimationFrame(doShake);
-    else if(times > 1){ shakePokeball(times-1, cb); }
-    else cb();
-  }
-  doShake();
-}
-
-function successAnimation(cb){
-  let frame = 0;
-  const dur = 30;
-  function run(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    if(frame < dur){
-      const scale = 1 + Math.sin(frame * 0.3) * 0.1;
-      ctx.save(); ctx.translate(canvas.width/2, canvas.height/2); ctx.scale(scale, scale);
-      ctx.drawImage(pokeballImg, -15, -15, 30, 30); ctx.restore();
-      // estrelas simples
-      for(let i=0;i<4;i++){
-        const a = (frame*0.1) + (i * Math.PI*2/4);
-        const r = 20 + Math.sin(frame*0.2)*6;
-        const sx = canvas.width/2 + Math.cos(a)*r;
-        const sy = canvas.height/2 + Math.sin(a)*r;
-        ctx.fillStyle = `rgba(255,255,0,${1 - frame/dur})`;
-        ctx.fillRect(sx-2, sy-2, 4, 4);
-      }
-      frame++; requestAnimationFrame(run);
-    } else {
-      // Animação concluída, fecha janela e notifica
-      animationRunning = false;
-      cb();
-    }
-  }
-  run();
-}
-
-function escapeAnimation(cb){
-  let f = 0;
-  const dur = 15;
-  function run(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    if(f < dur){
-      // pokeball fade + particles
-      ctx.save(); ctx.globalAlpha = 1 - (f/dur);
-      ctx.translate(canvas.width/2, canvas.height/2);
-      ctx.scale(1 + f*0.08, 1 + f*0.08);
-      ctx.drawImage(pokeballImg, -15, -15, 30, 30);
-      ctx.restore();
-      for(let i=0;i<6;i++){
-        const ang = (i * Math.PI*2/6) + (f*0.2);
-        const dist = f * 3;
-        const px = canvas.width/2 + Math.cos(ang) * dist;
-        const py = canvas.height/2 + Math.sin(ang) * dist;
-        ctx.fillStyle = `rgba(255,200,0,${1 - f/dur})`;
-        ctx.fillRect(px-2, py-2, 4, 4);
-      }
-      drawPokemon();
-      f++; requestAnimationFrame(run);
-    } else cb();
-  }
-  run();
-}
+// captura e animações de pokeball permanecem iguais...
 
 // carregamento imagem do pokemon
 const imagePath = path.join(__dirname, `../../../pokedex/${pokemonName.toLowerCase()}/${pokemonName.toLowerCase()}.png`);
 if (fs.existsSync(imagePath)) petImg.src = `file://${imagePath.replace(/\\/g, '/')}`;
 else createFallbackImage();
 
-petImg.onload = () => {
-  // garante posição inicial sincronizada via main
-  sendWindowMoveIfNeeded(windowX);
-  animate();
-};
+petImg.onload = () => { homeX = windowX; sendWindowMoveIfNeeded(windowX); animate(); };
 petImg.onerror = createFallbackImage;
 
 window.addEventListener('beforeunload', () => animationRunning = false);

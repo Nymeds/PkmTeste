@@ -14,8 +14,8 @@ const MAX_ACTIVE_PETS = 3; // starter + 2 capturados
 // ===================
 // Criar pet (janela + card)
 // ===================
-function createPet(id, name, isStarter, isTeamMember = false) {
-  console.log(`[CreatePet] ID=${id} Name=${name} Starter=${isStarter} Team=${isTeamMember}`);
+function createPet(id, name, isStarter, isTeamMember = false, dbId = null) {
+  console.log(`[CreatePet] ID=${id} Name=${name} Starter=${isStarter} Team=${isTeamMember} DbId=${dbId}`);
   
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   const startX = Math.floor(Math.random() * (width - 120));
@@ -40,7 +40,8 @@ function createPet(id, name, isStarter, isTeamMember = false) {
         `--pokemonName=${name}`,
         `--starter=${isStarter}`,
         `--petId=${id}`,
-        `--teamMember=${isTeamMember}`
+        `--teamMember=${isTeamMember}`,
+        `--dbId=${dbId || ''}`
       ],
     },
   });
@@ -67,7 +68,7 @@ function createPet(id, name, isStarter, isTeamMember = false) {
   cardWin.loadFile(path.join(__dirname, '../renderer/card/card.html'));
   cardWin.setMenu(null);
 
-  pets.push({ id, petWin, cardWin, isStarter, name, isTeamMember });
+  pets.push({ id, petWin, cardWin, isStarter, name, isTeamMember, dbId });
   console.log(`[CreatePet] Total de pets ativos: ${pets.length}`);
 }
 
@@ -88,7 +89,7 @@ async function spawnFreePokemon() {
   const id = Date.now() + Math.floor(Math.random() * 1000);
 
   console.log(`[Spawn] Criando ${freePokemonName} com ID ${id}`);
-  createPet(id, freePokemonName, false, false);
+  createPet(id, freePokemonName, false, false, null);
 
   setTimeout(() => {
     const pet = pets.find(p => p.id === id);
@@ -131,11 +132,11 @@ ipcMain.on('update-card', async (event, id, data) => {
 
   pet.cardWin.webContents.send('update-stats', data);
 
-  // Salva XP/level no banco se for starter ou membro
-  if (pet.isStarter || pet.isTeamMember) {
+  // Salva XP/level no banco se for starter ou membro E tiver dbId
+  if ((pet.isStarter || pet.isTeamMember) && pet.dbId) {
     try {
       await prisma.pokemon.update({
-        where: { id: data.id },
+        where: { id: pet.dbId },
         data: {
           xp: data.xp,
           level: data.level,
@@ -163,17 +164,6 @@ ipcMain.on('move-window', (event, id, newX, jumpHeight) => {
   const y = Math.max(0, Math.min(yBase - jumpHeight, height - 120));
 
   pet.petWin.setBounds({ x, y, width: 120, height: 120 });
-
-  if (id === 1) {
-    pets.forEach(p => {
-      if (p.isTeamMember) {
-        const slot = p.id - 1000;
-        const offset = slot * 60 - 60;
-        const teamX = Math.max(0, Math.min(x - offset, width - 120));
-        if (!p.petWin.isDestroyed()) p.petWin.setBounds({ x: teamX, y, width: 120, height: 120 });
-      }
-    });
-  }
 });
 
 // ===================
@@ -234,9 +224,9 @@ ipcMain.on('capture-success', async (event, petId, pokemonData) => {
                 data: { slot, pokemonId: capturedPokemon.id } 
               });
               
-              // Spawna na tela
+              // Spawna na tela com dbId
               const newPetId = 1000 + slot;
-              createPet(newPetId, capturedPokemon.name, false, true);
+              createPet(newPetId, capturedPokemon.name, false, true, capturedPokemon.id);
               
               console.log('[Capture] Pokémon adicionado ao time no slot', slot);
               break;
@@ -274,14 +264,14 @@ app.whenReady().then(async () => {
       return;
     }
 
-    createPet(1, starter.name, true);
+    createPet(1, starter.name, true, false, starter.id);
 
     // Carrega equipe
     const teamSlots = await prisma.teamSlot.findMany({ include: { pokemon: true }, orderBy: { slot: 'asc' } });
     for (const slot of teamSlots) {
       if (slot.slot === 1) continue;
       const petId = 1000 + slot.slot;
-      createPet(petId, slot.pokemon.name, false, true);
+      createPet(petId, slot.pokemon.name, false, true, slot.pokemon.id);
     }
 
     // Spawn de pokémons livres
