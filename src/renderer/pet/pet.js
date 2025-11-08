@@ -150,7 +150,7 @@ function sendWindowMoveIfNeeded(xToSend){
 function maybeChangeDirection(){ if(Math.random()<0.2) direction *= -1; }
 
 function updateStats(){
-  if(!isStarter) return;
+  if(!isStarter && !isTeamMember) return; // só time
   pokemonData.xp += 1;
   if(pokemonData.xp >= pokemonData.level*100){
     pokemonData.xp = 0;
@@ -163,9 +163,15 @@ function updateStats(){
   ipcRenderer.send('update-card', id, pokemonData);
 }
 
+
 // hover events
 hoverZone.addEventListener('mouseenter', () => { ipcRenderer.send('show-card', id); ipcRenderer.send('update-card', id, pokemonData); });
 hoverZone.addEventListener('mouseleave', () => ipcRenderer.send('hide-card', id));
+ipcRenderer.on('request-stats', () => {
+  if (pokemonData && dbId) {
+    ipcRenderer.send('update-card', id, pokemonData);
+  }
+});
 
 // click captura
 // click captura
@@ -418,8 +424,9 @@ function animate(){
   drawPokemon();
   requestAnimationFrame(animate);
 }
-
-if(isStarter) setInterval(updateStats,3000);
+if(isTeamMember || isStarter) {
+  setInterval(updateStats, 3000); // 3s por tick de XP
+}
 
 // captura e animações de pokeball permanecem iguais...
 
