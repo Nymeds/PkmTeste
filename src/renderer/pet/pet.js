@@ -41,7 +41,26 @@ let pokemonData = {
 // --- Imagens ---
 let petImg = new Image();
 let pokeballImg = new Image();
-pokeballImg.src = path.join(__dirname, '../../../assets/pokeball.png').replace(/\\/g, '/');
+let pokeballLoaded = false;
+
+// Tenta carregar pokeball, se falhar cria uma
+const pokeballPath = path.join(__dirname, '../../../assets/pokeball.png');
+if (fs.existsSync(pokeballPath)) {
+    pokeballImg.src = `file://${pokeballPath.replace(/\\/g, '/')}`;
+} else {
+    console.warn(`[Pet ${id}] Pokeball não encontrada, criando fallback`);
+    createFallbackPokeball();
+}
+
+pokeballImg.onload = () => {
+    pokeballLoaded = true;
+    console.log(`[Pet ${id}] Pokeball carregada`);
+};
+
+pokeballImg.onerror = () => {
+    console.error(`[Pet ${id}] Erro ao carregar pokeball, usando fallback`);
+    createFallbackPokeball();
+};
 
 // --- Movimento ---
 let x = 0;
@@ -79,6 +98,48 @@ function createFallbackImage() {
     tempCtx.font = 'bold 20px Arial';
     tempCtx.fillText('?', 32, 48);
     petImg.src = tempCanvas.toDataURL();
+}
+
+function createFallbackPokeball() {
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = 30;
+    tempCanvas.height = 30;
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    // Metade superior vermelha
+    tempCtx.fillStyle = '#FF0000';
+    tempCtx.beginPath();
+    tempCtx.arc(15, 15, 15, Math.PI, 0, false);
+    tempCtx.fill();
+    
+    // Metade inferior branca
+    tempCtx.fillStyle = '#FFFFFF';
+    tempCtx.beginPath();
+    tempCtx.arc(15, 15, 15, 0, Math.PI, false);
+    tempCtx.fill();
+    
+    // Linha preta no meio
+    tempCtx.strokeStyle = '#000000';
+    tempCtx.lineWidth = 2;
+    tempCtx.beginPath();
+    tempCtx.moveTo(0, 15);
+    tempCtx.lineTo(30, 15);
+    tempCtx.stroke();
+    
+    // Círculo central
+    tempCtx.fillStyle = '#000000';
+    tempCtx.beginPath();
+    tempCtx.arc(15, 15, 4, 0, Math.PI * 2);
+    tempCtx.fill();
+    
+    tempCtx.fillStyle = '#FFFFFF';
+    tempCtx.beginPath();
+    tempCtx.arc(15, 15, 2, 0, Math.PI * 2);
+    tempCtx.fill();
+    
+    pokeballImg.src = tempCanvas.toDataURL();
+    pokeballLoaded = true;
+    console.log(`[Pet ${id}] Pokeball fallback criada`);
 }
 
 function getRandomDuration(min, max) {
@@ -154,6 +215,8 @@ if (isCapturable) {
     hoverZone.addEventListener('mouseenter', () => {
         hoverZone.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
         ipcRenderer.send('show-card', id);
+        // Envia dados atuais do pokémon
+        ipcRenderer.send('update-card', id, pokemonData);
     });
     
     hoverZone.addEventListener('mouseleave', () => {
@@ -162,13 +225,22 @@ if (isCapturable) {
     });
 } else {
     // Apenas mostra card para starters
-    hoverZone.addEventListener('mouseenter', () => ipcRenderer.send('show-card', id));
+    hoverZone.addEventListener('mouseenter', () => {
+        ipcRenderer.send('show-card', id);
+        ipcRenderer.send('update-card', id, pokemonData);
+    });
     hoverZone.addEventListener('mouseleave', () => ipcRenderer.send('hide-card', id));
 }
 
 // ----------------- FUNÇÕES DE LANÇAMENTO -----------------
 function throwPokeball() {
-    console.log(`[Pet ${id}] Lançando Pokébola`);
+    console.log(`[Pet ${id}] Lançando Pokébola (carregada: ${pokeballLoaded})`);
+    
+    // Se pokeball não carregou, aguarda um pouco
+    if (!pokeballLoaded) {
+        console.warn(`[Pet ${id}] Pokeball ainda não carregada, criando fallback`);
+        createFallbackPokeball();
+    }
     
     // Para o movimento do pokémon
     walkState = 'idle';
@@ -176,12 +248,12 @@ function throwPokeball() {
     jumpHeight = 0;
     
     const startX = canvas.width / 2;
-    const startY = canvas.height;
+    const startY = canvas.height + 30; // Começa fora da tela
     const targetX = canvas.width / 2;
     const targetY = canvas.height / 2;
 
     let t = 0;
-    const duration = 60;
+    const duration = 40; // Reduzido de 60 para 40
     const shakeCount = 3;
 
     function animateThrow() {
@@ -190,9 +262,15 @@ function throwPokeball() {
 
         const progress = t / duration;
         const currentX = startX + (targetX - startX) * progress;
-        const currentY = startY + (targetY - startY) * progress - 50 * Math.sin(progress * Math.PI);
+        const arc = Math.sin(progress * Math.PI);
+        const currentY = startY + (targetY - startY) * progress - 50 * arc;
         
-        ctx.drawImage(pokeballImg, currentX - 15, currentY - 15, 30, 30);
+        // Rotação da pokeball durante voo
+        ctx.save();
+        ctx.translate(currentX, currentY);
+        ctx.rotate(progress * Math.PI * 3);
+        ctx.drawImage(pokeballImg, -15, -15, 30, 30);
+        ctx.restore();
 
         t++;
         if (t <= duration) {
@@ -200,24 +278,96 @@ function throwPokeball() {
         } else {
             console.log(`[Pet ${id}] Pokébola atingiu o alvo, iniciando tremores`);
             shakePokeball(shakeCount, () => {
-                const captureChance = 0.7; // 70% de chance
+                const captureChance = 0.8; // 80% de chance
                 const caught = Math.random() < captureChance;
                 
-                console.log(`[Pet ${id}] Resultado da captura: ${caught ? 'SUCESSO' : 'FALHOU'}`);
+                console.log(`[Pet ${id}] Resultado da captura: ${caught ? 'SUCESSO ✓' : 'FALHOU ✗'}`);
                 
                 if (caught) {
-                    console.log(`[Pet ${id}] Enviando evento de captura para main`);
-                    ipcRenderer.send('capture-success', id, pokemonData);
+                    showCaptureSuccess();
                 } else {
                     console.log(`[Pet ${id}] Pokémon escapou, restaurando capturabilidade`);
                     isBeingCaptured = false;
                     walkState = 'walking';
+                    
+                    // Efeito visual de fuga
+                    let escapeFrame = 0;
+                    function escapeAnimation() {
+                        if (escapeFrame < 10) {
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                            
+                            // Pokeball explodindo
+                            ctx.save();
+                            ctx.globalAlpha = 1 - (escapeFrame / 10);
+                            ctx.translate(canvas.width / 2, canvas.height / 2);
+                            ctx.scale(1 + escapeFrame * 0.2, 1 + escapeFrame * 0.2);
+                            ctx.drawImage(pokeballImg, -15, -15, 30, 30);
+                            ctx.restore();
+                            
+                            drawPokemon();
+                            escapeFrame++;
+                            requestAnimationFrame(escapeAnimation);
+                        }
+                    }
+                    escapeAnimation();
                 }
             });
         }
     }
 
     animateThrow();
+}
+
+function showCaptureSuccess() {
+    console.log(`[Pet ${id}] Mostrando animação de sucesso`);
+    
+    let successFrame = 0;
+    const successDuration = 30;
+    
+    function successAnimation() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        if (successFrame < successDuration) {
+            // Pokeball pulsando
+            const scale = 1 + Math.sin(successFrame * 0.3) * 0.1;
+            ctx.save();
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.scale(scale, scale);
+            ctx.drawImage(pokeballImg, -15, -15, 30, 30);
+            ctx.restore();
+            
+            // Estrelas ao redor
+            for (let i = 0; i < 5; i++) {
+                const angle = (successFrame * 0.1) + (i * Math.PI * 2 / 5);
+                const radius = 30 + Math.sin(successFrame * 0.2) * 10;
+                const x = canvas.width / 2 + Math.cos(angle) * radius;
+                const y = canvas.height / 2 + Math.sin(angle) * radius;
+                
+                ctx.fillStyle = `rgba(255, 255, 0, ${1 - successFrame / successDuration})`;
+                ctx.beginPath();
+                ctx.moveTo(x, y - 5);
+                ctx.lineTo(x + 2, y);
+                ctx.lineTo(x + 5, y);
+                ctx.lineTo(x + 2, y + 2);
+                ctx.lineTo(x + 3, y + 5);
+                ctx.lineTo(x, y + 3);
+                ctx.lineTo(x - 3, y + 5);
+                ctx.lineTo(x - 2, y + 2);
+                ctx.lineTo(x - 5, y);
+                ctx.lineTo(x - 2, y);
+                ctx.closePath();
+                ctx.fill();
+            }
+            
+            successFrame++;
+            requestAnimationFrame(successAnimation);
+        } else {
+            console.log(`[Pet ${id}] Enviando evento de captura para main`);
+            ipcRenderer.send('capture-success', id, pokemonData);
+        }
+    }
+    
+    successAnimation();
 }
 
 function shakePokeball(times, callback) {
