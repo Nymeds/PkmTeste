@@ -19,7 +19,7 @@ const WORLD_WIDTH = canvas.width;
 const infoCard = document.createElement('div');
 infoCard.id = 'pokemon-info-card';
 infoCard.style.cssText = `
-  position: absolute;
+  position: fixed;
   background: rgba(255, 255, 255, 0.95);
   border: 2px solid #333;
   border-radius: 12px;
@@ -28,12 +28,17 @@ infoCard.style.cssText = `
   font-size: 12px;
   pointer-events: none;
   display: none;
-  z-index: 1000;
+  z-index: 9999;
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   min-width: 180px;
   max-width: 250px;
+  overflow: visible;
 `;
 document.body.appendChild(infoCard);
+
+// Garantir que o body não corta elementos
+document.body.style.overflow = 'visible';
+document.documentElement.style.overflow = 'visible';
 
 // util
 function getRandomRange(min, max) { return Math.random() * (max - min) + min; }
@@ -291,15 +296,35 @@ class PetManager {
 
   updateInfoCardPosition(mouseX, mouseY) {
     const offset = 15;
+    
+    // Forçar o card a renderizar primeiro para obter dimensões corretas
+    infoCard.style.display = 'block';
+    infoCard.style.visibility = 'hidden';
+    
+    const cardWidth = infoCard.offsetWidth;
+    const cardHeight = infoCard.offsetHeight;
+    
+    infoCard.style.visibility = 'visible';
+    
     let x = mouseX + offset;
     let y = mouseY + offset;
 
-    const cardRect = infoCard.getBoundingClientRect();
-    if (x + cardRect.width > window.innerWidth) {
-      x = mouseX - cardRect.width - offset;
+    // Ajustar para não sair da tela
+    const maxX = window.innerWidth - cardWidth - 10;
+    const maxY = window.innerHeight - cardHeight - 10;
+    
+    if (x > maxX) {
+      x = mouseX - cardWidth - offset;
     }
-    if (y + cardRect.height > window.innerHeight) {
-      y = mouseY - cardRect.height - offset;
+    if (x < 10) {
+      x = 10;
+    }
+    
+    if (y > maxY) {
+      y = mouseY - cardHeight - offset;
+    }
+    if (y < 10) {
+      y = 10;
     }
 
     infoCard.style.left = x + 'px';

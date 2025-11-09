@@ -1,32 +1,49 @@
-<!-- index.html-->
+<!-- index.html - Corrigido -->
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Desktop Pet - Pokémon</title>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { margin: 0; overflow: hidden; background: transparent; }
+* { 
+  margin: 0; 
+  padding: 0; 
+  box-sizing: border-box; 
+}
+
+html, body { 
+  margin: 0; 
+  padding: 0;
+  overflow: visible !important; 
+  background: transparent;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
 /* Ajuste do canvas para comportar múltiplos pets */
 canvas {
-position: absolute;
-bottom: 0;
-left: 0;
-background: transparent;
-image-rendering: pixelated; /* Para sprites pixelados ficarem nítidos */
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  background: transparent;
+  image-rendering: pixelated; /* Para sprites pixelados ficarem nítidos */
+}
+
+/* Garantir que elementos flutuantes não sejam cortados */
+#pokemon-info-card {
+  position: fixed !important;
+  z-index: 99999 !important;
 }
 </style>
 </head>
-
 
 <body>
 <!-- Aqui definimos um canvas maior para poder exibir múltiplos pets. Pode mudar width/height se quiser -->
 <canvas id="petCanvas" width="480" height="120"></canvas>
 <script src="pet.js"></script>
 </body>
-
 
 </html>

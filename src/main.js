@@ -1,4 +1,4 @@
-// main.js (ajustado)
+// main.js (ajustado para permitir card flutuante)
 const { app, BrowserWindow, screen, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -74,12 +74,18 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-      enableRemoteModule: true
+      enableRemoteModule: true,
+      // Permitir que elementos flutuantes saiam da janela
+      webviewTag: false
     }
   });
 
   win.loadFile(path.join(__dirname, 'index.html'));
-  win.setIgnoreMouseEvents(true, { forward: true });
+  
+  // IMPORTANTE: Não bloquear eventos do mouse completamente
+  // Isso permite que o hover funcione, mas clicks passam através
+  win.setIgnoreMouseEvents(false);
+  
   win.setMenu(null);
 
   win.webContents.on('did-finish-load', async () => {
@@ -100,7 +106,6 @@ function createWindow() {
       }
     } catch (e) {
       console.error('Erro ao acessar DB:', e);
-      // se falhar por ausência de tabelas, avisa no console e abre a janela de starter pra não travar o user
       openStarterWindow();
     }
   });
