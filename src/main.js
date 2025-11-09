@@ -53,7 +53,6 @@ function readPokedex(dir = POKEDEX_DIR) {
       imageUrl: imagePath ? pathToFileURL(imagePath).href : null
     });
   }
-  console.log(`[main] readPokedex -> ${list.length} entries`);
   return list;
 }
 
@@ -80,15 +79,6 @@ function createCardWindow() {
 
   cardWin.loadFile(path.join(__dirname, 'card.html'));
   cardWin.setIgnoreMouseEvents(true, { forward: true });
-  
-  // Abrir DevTools para debug
-  cardWin.webContents.openDevTools({ mode: 'detach' });
-  
-  cardWin.webContents.on('did-finish-load', () => {
-    console.log('[main] Card window loaded successfully');
-  });
-  
-  console.log('[main] Card window created');
 }
 
 function createWindow() {
@@ -117,17 +107,12 @@ function createWindow() {
   win.setIgnoreMouseEvents(false);
   win.setMenu(null);
 
-  // Abrir DevTools para debug
-  win.webContents.openDevTools({ mode: 'detach' });
-
-  // Criar janela do card após a janela principal
   createCardWindow();
 
   win.webContents.on('did-finish-load', async () => {
     try {
       const team = await prisma.team.findFirst({ include: { capturedPokemons: true } });
       if (!team || !team.capturedPokemons || team.capturedPokemons.length === 0) {
-        console.log('[main] nenhum time/capturedPokemons encontrado -> abrindo starter window');
         openStarterWindow();
       } else {
         const payload = team.capturedPokemons.map(p => ({
@@ -136,7 +121,6 @@ function createWindow() {
           stats: (() => { try { return JSON.parse(p.stats || '{}'); } catch(e){ return {}; } })(),
           imagePath: p.imagePath
         }));
-        console.log('[main] enviando persisted-pokemons para renderer', payload);
         win.webContents.send('persisted-pokemons', payload);
       }
     } catch (e) {
@@ -152,7 +136,6 @@ function createWindow() {
 
 async function openStarterWindow() {
   if (starterWin && !starterWin.isDestroyed()) return;
-  const { width } = screen.getPrimaryDisplay().workAreaSize;
 
   starterWin = new BrowserWindow({
     width: 420,
@@ -185,19 +168,25 @@ async function openStarterWindow() {
   });
 }
 
-// IPC para controlar o card de informações
 ipcMain.on('show-card', (event, data) => {
-  console.log('[main] Received show-card:', data);
-  if (cardWin && !cardWin.isDestroyed()) {
-    console.log('[main] Sending to card window');
-    cardWin.webContents.send('display-card', data);
-  } else {
-    console.log('[main] Card window not available!');
+  if (cardWin && !cardWin.isDestroyed() && win && !win.isDestroyed()) {
+    // Pegar a posição da janela principal
+    const winBounds = win.getBounds();
+    
+    // Converter coordenadas relativas ao canvas para coordenadas de tela
+    const screenX = winBounds.x + data.x;
+    const screenY = winBounds.y + data.y;
+    
+    cardWin.webContents.send('display-card', {
+      stats: data.stats,
+      x: screenX,
+      y: screenY,
+      persistent: data.persistent
+    });
   }
 });
 
 ipcMain.on('hide-card', (event) => {
-  console.log('[main] Received hide-card');
   if (cardWin && !cardWin.isDestroyed()) {
     cardWin.webContents.send('hide-card');
   }
@@ -205,7 +194,6 @@ ipcMain.on('hide-card', (event) => {
 
 ipcMain.on('select-starter', async (event, payload) => {
   try {
-    console.log('[main] select-starter payload:', payload);
     let team = await prisma.team.findFirst();
     if (!team) team = await prisma.team.create({ data: { name: 'PlayerTeam' } });
 
@@ -236,7 +224,6 @@ ipcMain.on('select-starter', async (event, payload) => {
     }
 
     if (starterWin && !starterWin.isDestroyed()) starterWin.close();
-    console.log('[main] starter salvo no DB, uuid:', cp.uuid);
 
   } catch (e) {
     console.error('Erro criando registro no DB:', e);

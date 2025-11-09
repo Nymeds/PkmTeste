@@ -4,25 +4,19 @@ const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
-console.log('[pet.js] starting renderer script');
-
-// Canvas
 const canvas = document.getElementById('petCanvas');
 const ctx = canvas.getContext('2d');
 
-// Configs
 const DEFAULT_SPRITE = path.join(__dirname, '..', 'pet.png');
 const POKEDEX_DIR = path.join(__dirname, '..', 'pokedex');
 const WORLD_WIDTH = canvas.width;
 
-// util
 function getRandomRange(min, max) { return Math.random() * (max - min) + min; }
 
-// loadPokedex
 function loadPokedex(dir = POKEDEX_DIR) {
   const result = [];
   try {
-    if (!fs.existsSync(dir)) { console.warn('[pet.js] pokedex dir missing:', dir); return result; }
+    if (!fs.existsSync(dir)) return result;
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const ent of entries) {
       if (!ent.isDirectory()) continue;
@@ -32,7 +26,7 @@ function loadPokedex(dir = POKEDEX_DIR) {
       let stats = null;
       if (fs.existsSync(statsPath)) {
         try { stats = JSON.parse(fs.readFileSync(statsPath, 'utf8')); }
-        catch (e) { console.error('[pet.js] error parsing stats:', statsPath, e); }
+        catch (e) { console.error('Error parsing stats:', statsPath, e); }
       }
       let imagePath = null;
       const tryNames = [`${name}.png`,`${name}.jpg`,`${name}.jpeg`,`${name}.webp`,'sprite.png','icon.png'];
@@ -55,12 +49,10 @@ function loadPokedex(dir = POKEDEX_DIR) {
         imageUrl: imagePath ? pathToFileURL(imagePath).href : null
       });
     }
-  } catch (err) { console.error('[pet.js] loadPokedex error', err); }
-  console.log('[pet.js] loadPokedex ->', result.length, 'entries');
+  } catch (err) { console.error('loadPokedex error', err); }
   return result;
 }
 
-// Pet class
 class Pet {
   constructor({ id, x = 0, speedBase = 1.2, spriteImg = null, stats = null }) {
     this.id = id ?? `pet-${Math.floor(Math.random() * 99999)}`;
@@ -139,7 +131,8 @@ class Pet {
     ctx.save();
     ctx.translate(screenX + this.width / 2, totalY);
     ctx.rotate(this.tilt);
-    ctx.scale(this.direction >= 0 ? 1 : -1, 1 - this.squash);
+    // Invertido: quando direction é positivo (direita), espelha a imagem
+    ctx.scale(this.direction >= 0 ? -1 : 1, 1 - this.squash);
 
     if (img && img.complete && img.naturalWidth > 0) {
       ctx.drawImage(img, -this.width / 2, -this.height / 2, this.width, this.height);
@@ -151,7 +144,6 @@ class Pet {
     ctx.restore();
   }
 
-  // Método para verificar se o mouse está sobre o pet
   isMouseOver(mouseX, mouseY, cameraX = 0) {
     const screenX = this.worldX - cameraX;
     const bob = Math.sin(this.walkTimer * 0.1) * (this.isWalking ? 2 : 0);
@@ -166,21 +158,17 @@ class Pet {
     return mouseX >= left && mouseX <= right && mouseY >= top && mouseY <= bottom;
   }
 
-  // Obter posição do centro do pet na tela
   getScreenPosition(cameraX = 0) {
     const screenX = this.worldX - cameraX + this.width / 2;
     const bob = Math.sin(this.walkTimer * 0.1) * (this.isWalking ? 2 : 0);
     const baseY = canvas.height - this.height / 2;
     const totalY = baseY - this.jumpHeight - bob;
-    
-    // Retornar a posição do TOPO da cabeça do pokemon (não o centro)
     const topY = totalY - this.height / 2;
     
     return { x: screenX, y: topY };
   }
 }
 
-// PetManager
 class PetManager {
   constructor(canvas, ctx, options = {}) {
     this.canvas = canvas;
@@ -218,7 +206,6 @@ class PetManager {
           this.hideInfoCard();
         }
       } else if (foundPet) {
-        // Atualizar posição do card seguindo o pokemon
         this.updateInfoCardPosition(foundPet);
       }
     });
@@ -230,45 +217,30 @@ class PetManager {
   }
 
   showInfoCard(pet) {
-    const rect = this.canvas.getBoundingClientRect();
     const petPos = pet.getScreenPosition(this.cameraX);
     
-    console.log('[pet.js] showInfoCard called for:', pet.id);
-    console.log('[pet.js] Canvas rect:', rect);
-    console.log('[pet.js] Pet position:', petPos);
-    
-    // Converter para coordenadas absolutas da tela
-    // petPos.x já é o centro do pokemon, petPos.y é o topo
-    const x = rect.left + petPos.x;
-    const y = rect.top + petPos.y;
-    
-    console.log('[pet.js] Sending show-card with x:', x, 'y:', y);
-    
+    // Enviar coordenadas relativas ao canvas
+    // O main.js vai converter para coordenadas de tela
     ipcRenderer.send('show-card', {
       stats: pet.stats || {},
-      x: Math.round(x),
-      y: Math.round(y),
+      x: Math.round(petPos.x),
+      y: Math.round(petPos.y),
       persistent: pet.persistent || false
     });
   }
 
   updateInfoCardPosition(pet) {
-    const rect = this.canvas.getBoundingClientRect();
     const petPos = pet.getScreenPosition(this.cameraX);
-    
-    const x = rect.left + petPos.x - 125;
-    const y = rect.top + petPos.y - 200;
     
     ipcRenderer.send('show-card', {
       stats: pet.stats || {},
-      x: Math.round(x),
-      y: Math.round(y),
+      x: Math.round(petPos.x),
+      y: Math.round(petPos.y),
       persistent: pet.persistent || false
     });
   }
 
   hideInfoCard() {
-    console.log('[pet.js] hideInfoCard called');
     ipcRenderer.send('hide-card');
   }
 
@@ -290,7 +262,7 @@ class PetManager {
 
   addPetFromPokedex(name, opts = {}) {
     const entry = this.pokedex.find(p => p.id.toLowerCase() === String(name).toLowerCase());
-    if (!entry) { console.warn('[petManager] not found in pokedex:', name); return null; }
+    if (!entry) return null;
     const spriteImg = entry.imgObj || this.defaultImage;
     const pet = new Pet({
       id: opts.id ?? entry.id,
@@ -302,7 +274,6 @@ class PetManager {
     if (opts.persistent) pet.persistent = true;
     if (typeof opts.direction === 'number') pet.direction = opts.direction;
     this.pets.push(pet);
-    console.log('[petManager] added petFromPokedex', pet.id, 'persistent=', !!pet.persistent);
     return pet;
   }
 
@@ -359,22 +330,18 @@ class PetManager {
 const manager = new PetManager(canvas, ctx);
 
 function startAutoRespawn() {
-  console.log('[petManager] Auto respawn will start in 10s...');
   setTimeout(() => {
-    console.log('[petManager] Auto respawn started.');
     const qtd = Math.floor(getRandomRange(2, 6));
     manager.respawnRandomFromPokedex(qtd);
 
     setInterval(() => {
       const qtd = Math.floor(getRandomRange(2, 6));
       manager.respawnRandomFromPokedex(qtd);
-      console.log(`[petManager] Respawned ${qtd} new pokemons (preserving persistent).`);
     }, 30_000);
   }, 10_000);
 }
 
 ipcRenderer.on('persisted-pokemons', (evt, list) => {
-  console.log('[pet.js] received persisted-pokemons', list);
   for (const p of list) {
     manager.addPetFromPokedex(p.id, { id: p.uuid ?? p.id, x: 20, persistent: true });
   }
@@ -382,7 +349,6 @@ ipcRenderer.on('persisted-pokemons', (evt, list) => {
 });
 
 ipcRenderer.on('starter-selected', (evt, payload) => {
-  console.log('[pet.js] starter-selected', payload);
   if (payload && payload.species) {
     manager.addPetFromPokedex(payload.species, { id: payload.uuid ?? payload.species, x: 20, persistent: true });
     startAutoRespawn();

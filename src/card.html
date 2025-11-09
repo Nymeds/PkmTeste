@@ -119,11 +119,7 @@
     const { ipcRenderer } = require('electron');
     const card = document.getElementById('card');
 
-    console.log('[card.html] Script loaded');
-
     ipcRenderer.on('display-card', (event, data) => {
-      console.log('[card.html] Received display-card:', data);
-      
       const { stats, x, y, persistent } = data;
       
       const name = stats.name || 'Unknown';
@@ -131,8 +127,6 @@
       const baseStats = stats.baseStats || {};
       const description = stats.description || 'Sem descrição disponível.';
       const color = stats.color || '#999';
-
-      console.log('[card.html] Building card HTML for:', name);
 
       let html = `
         <div class="card-header" style="border-color: ${color};">
@@ -167,33 +161,26 @@
       }
 
       card.innerHTML = html;
+      card.style.display = 'block';
       
-      // Aguardar o DOM atualizar para obter a altura real do card
       requestAnimationFrame(() => {
-        const cardHeight = card.offsetHeight;
-        const cardWidth = card.offsetWidth;
+        const cardHeight = card.offsetHeight || 200;
+        const cardWidth = card.offsetWidth || 250;
         
-        // Posicionar acima do pokemon com espaçamento
-        const finalX = Math.max(0, x - (cardWidth / 2));
-        const finalY = Math.max(0, y - cardHeight - 10); // 10px de espaçamento
+        const finalX = Math.max(5, x - (cardWidth / 2));
+        const finalY = Math.max(5, y - cardHeight - 15);
         
         card.style.left = finalX + 'px';
         card.style.top = finalY + 'px';
-        card.style.display = 'block';
         
-        console.log('[card.html] Card positioned at:', finalX, finalY, 'card size:', cardWidth, cardHeight);
-        
-        // Forçar opacity para 1 imediatamente
         setTimeout(() => {
           card.style.opacity = '1';
           card.classList.add('visible');
-          console.log('[card.html] Card should be visible now');
         }, 10);
       });
     });
 
     ipcRenderer.on('hide-card', () => {
-      console.log('[card.html] Received hide-card');
       card.classList.remove('visible');
       card.style.opacity = '0';
       setTimeout(() => {
