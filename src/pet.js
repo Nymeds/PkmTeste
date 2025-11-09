@@ -6,6 +6,8 @@ const { pathToFileURL } = require('url');
 
 const canvas = document.getElementById('petCanvas');
 const ctx = canvas.getContext('2d');
+// Altura do chão dos Pokémon — quanto maior, mais para cima eles ficam
+let POKEMON_GROUND_OFFSET = -10; // pixels (0 = encostado no fundo)
 
 const DEFAULT_SPRITE = path.join(__dirname, '..', 'pet.png');
 const POKEDEX_DIR = path.join(__dirname, '..', 'pokedex');
@@ -251,7 +253,7 @@ class Pet {
     const img = this.sprite;
     const screenX = Math.floor(this.worldX - cameraX);
     const bob = Math.sin(this.walkTimer * 0.1) * (this.isWalking ? 2 : 0);
-    const baseY = canvas.height - this.height / 2;
+    const baseY = canvas.height - this.height / 2 - POKEMON_GROUND_OFFSET;
     const totalY = baseY - this.jumpHeight - bob;
 
     ctx.save();
@@ -710,15 +712,20 @@ ipcRenderer.on('starter-selected', (evt, payload) => {
 });
 
 ipcRenderer.on('pokemon-captured', (evt, payload) => {
-  console.log('Pokémon adicionado ao time:', payload);
-  manager.addPetFromPokedex(payload.species, {
-    id: payload.uuid,
-    uuid: payload.uuid,
-    x: 20,
-    persistent: true,
-    level: payload.level,
-    xp: payload.xp
-  });
+  console.log('Pokémon capturado! Vai aparecer em 4 segundos...', payload);
+
+  // Aguarda 4 segundos antes de renderizar o novo Pokémon
+  setTimeout(() => {
+    manager.addPetFromPokedex(payload.species, {
+      id: payload.uuid,
+      uuid: payload.uuid,
+      x: 20,
+      persistent: true,
+      level: payload.level,
+      xp: payload.xp
+    });
+    console.log(`${payload.species} adicionado ao time!`);
+  }, 4000);
 });
 
 manager.start();
