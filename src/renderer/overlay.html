@@ -4,27 +4,128 @@
   <meta charset="UTF-8" />
   <title>Pokémon Companion</title>
   <style>
-    body {
-      background: transparent;
+    * {
       margin: 0;
-      overflow: hidden;
+      padding: 0;
+      box-sizing: border-box;
     }
 
-    #pokemon {
+    body {
+      background: transparent;
+      overflow: hidden;
+      width: 100vw;
+      height: 200px;
+      position: relative;
+    }
+
+    #container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    .pokemon-wrapper {
       position: absolute;
       width: 128px;
       height: 128px;
-      animation: walk 1s steps(4) infinite;
+      transition: transform 0.1s ease;
     }
 
-    @keyframes walk {
-      from { transform: translateX(0); }
-      to { transform: translateX(10px); }
+    .pokemon-sprite {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+      image-rendering: pixelated;
+    }
+
+    .pokemon-card {
+      position: absolute;
+      top: -220px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.95);
+      border: 3px solid #333;
+      border-radius: 12px;
+      padding: 0;
+      min-width: 200px;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+      z-index: 1000;
+      font-family: 'Arial', sans-serif;
+      font-size: 13px;
+      pointer-events: none;
+    }
+
+    .pokemon-card.hidden {
+      display: none;
+    }
+
+    .card-header {
+      background: #f39c12;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 8px 8px 0 0;
+      font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .wild-tag {
+      background: #e74c3c;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: bold;
+    }
+
+    .card-body {
+      padding: 10px 12px;
+      color: #333;
+    }
+
+    .card-body p {
+      margin: 5px 0;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .xp-bar {
+      width: 100%;
+      height: 12px;
+      background: #ddd;
+      border-radius: 6px;
+      overflow: hidden;
+      margin: 5px 0;
+      border: 1px solid #999;
+    }
+
+    .xp-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #3498db, #2ecc71);
+      transition: width 0.3s ease;
+    }
+
+    .xp-text {
+      font-size: 11px;
+      color: #666;
+      text-align: center;
+      margin-top: -3px;
+    }
+
+    /* Animação de idle quando parado */
+    @keyframes idle {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-2px); }
+    }
+
+    .pokemon-wrapper.paused .pokemon-sprite {
+      animation: idle 1s ease-in-out infinite;
     }
   </style>
 </head>
 <body>
-  <img id="pokemon" />
+  <div id="container"></div>
   <script src="overlay.js"></script>
 </body>
 </html>
