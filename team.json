@@ -1,0 +1,15 @@
+[
+  {
+    "id": 1,
+    "uuid": "c5630e12-5350-4257-adf8-fc79b62a48b3",
+    "name": "Charmander",
+    "level": 1,
+    "xp": 0,
+    "hp": 39,
+    "maxHp": 39,
+    "attack": 52,
+    "defense": 43,
+    "speed": 65,
+    "createdAt": "2025-11-09T02:16:32.828Z"
+  }
+]
