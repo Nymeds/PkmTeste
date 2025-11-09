@@ -63,114 +63,108 @@ function loadPokedex(dir = POKEDEX_DIR) {
 
 // Pet class (fixed physics and flip)
 class Pet {
-  constructor({ id, x = 0, speedBase = 1.2, spriteImg = null, stats = null }) {
-    this.id = id ?? `pet-${Math.floor(Math.random() * 99999)}`;
-    this.worldX = x;
-    this.direction = Math.random() < 0.5 ? 1 : -1; // 1 => right, -1 => left
-    this.speedBase = speedBase;
-    this.speed = speedBase * getRandomRange(0.8, 1.2);
-
-    // physics
-    this.isWalking = true;
-    this.isJumping = false;
-    this.jumpHeight = 0;
-    this.jumpVelocity = 0;
-    this.gravity = 0.6;      // positive gravity
-    this.jumpStrength = -3;  // negative initial impulse
-
-    this.walkTimer = getRandomRange(0, 5000);
-    this.stateTimer = 0;
-    this.stateDuration = getRandomRange(200, 600);
-
-    this.squash = 0;
-    this.squashTimer = 0;
-    this.squashDuration = 8;
-
-    // visuals
-    this.width = 80;
-    this.height = 80;
-    this.bobAmplitude = 3;
-    this.swayAmplitude = 0.12;
-    this.nextBigJumpChance = 0.004;
-    this.tiltAmplitude = 0.07;
-    this.tiltSpeed = 0.25;
-
-    this.sprite = spriteImg;
-    this.stats = stats;
-    this.persistent = false;
-  }
-
-  update() {
-    this.stateTimer++;
-    if (this.stateTimer > this.stateDuration) this.switchState();
-
-    if (this.isWalking) {
-      if (Math.random() < 0.003) this.direction *= -1;
-      if (!this.isJumping && Math.random() < 0.02) {
+    constructor({ id, x = 0, speedBase = 1.2, spriteImg = null, stats = null }) {
+      this.id = id ?? `pet-${Math.floor(Math.random() * 99999)}`;
+      this.worldX = x;
+      this.direction = Math.random() < 0.5 ? 1 : -1;
+      this.targetDirection = this.direction;
+      this.speedBase = speedBase;
+      this.speed = speedBase * getRandomRange(0.8, 1.2);
+      this.maxSpeed = this.speed * 1.5;
+  
+      // estados
+      this.isWalking = true;
+      this.idleTimer = 0;
+      this.idleDuration = getRandomRange(200, 800);
+      this.walkTimer = 0;
+  
+      // física
+      this.jumpVelocity = 0;
+      this.jumpHeight = 0;
+      this.gravity = 0.4;
+      this.jumpStrength = 3;
+      this.isJumping = false;
+  
+      // visuais
+      this.width = 80;
+      this.height = 80;
+      this.squash = 0;
+      this.tilt = 0;
+      this.sprite = spriteImg;
+      this.stats = stats;
+      this.persistent = false;
+    }
+  
+    update() {
+      // alternar entre andar e parar
+      this.idleTimer++;
+      if (this.idleTimer > this.idleDuration) {
+        this.isWalking = !this.isWalking;
+        this.idleTimer = 0;
+        this.idleDuration = getRandomRange(200, 900);
+        if (this.isWalking) this.direction = Math.random() < 0.5 ? 1 : -1;
+      }
+  
+      // inverter suavemente direção
+      this.direction += (this.targetDirection - this.direction) * 0.1;
+  
+      // movimento horizontal
+      if (this.isWalking) {
+        this.worldX += this.speed * this.direction;
+        const max = WORLD_WIDTH - this.width;
+        if (this.worldX < 0) { this.worldX = 0; this.targetDirection = 1; }
+        if (this.worldX > max) { this.worldX = max; this.targetDirection = -1; }
+      }
+  
+      // chance pequena de pular
+      if (!this.isJumping && Math.random() < 0.005) {
         this.isJumping = true;
-        this.jumpVelocity = Math.random() < this.nextBigJumpChance ? this.jumpStrength * 1.3 : this.jumpStrength;
+        this.jumpVelocity = this.jumpStrength * getRandomRange(0.8, 1.2);
       }
-      this.worldX += this.speed * this.direction;
-      const max = WORLD_WIDTH - this.width;
-      if (this.worldX > max) { this.worldX = max; this.direction = -1; }
-      if (this.worldX < 0) { this.worldX = 0; this.direction = 1; }
-    } else {
-      if (Math.random() < 0.004 && !this.isJumping) {
-        this.isJumping = true;
-        this.jumpVelocity = this.jumpStrength * 0.6;
+  
+      // física do pulo
+      if (this.isJumping) {
+        this.jumpVelocity += this.gravity;
+        this.jumpHeight += this.jumpVelocity;
+        if (this.jumpHeight >= 0) {
+          this.jumpHeight = 0;
+          this.isJumping = false;
+          this.squash = 0.25;
+        }
       }
+  
+      // squash relaxa com o tempo
+      this.squash *= 0.8;
+  
+      // inclinação leve
+      this.tilt = Math.sin(this.walkTimer * 0.2) * 0.05 * (this.isWalking ? 1 : 0);
+  
+      this.walkTimer++;
     }
-
-    if (this.isJumping) {
-      this.jumpVelocity += this.gravity;
-      this.jumpHeight += this.jumpVelocity;
-      if (this.jumpHeight >= 0) {
-        this.jumpHeight = 0;
-        this.isJumping = false;
-        this.squash = 0.3;
-        this.squashTimer = 0;
+  
+    draw(ctx, cameraX = 0) {
+      const img = this.sprite;
+      const screenX = Math.floor(this.worldX - cameraX);
+      const bob = Math.sin(this.walkTimer * 0.1) * (this.isWalking ? 2 : 0);
+      const baseY = canvas.height - this.height / 2;
+      const totalY = baseY - this.jumpHeight - bob;
+  
+      ctx.save();
+      ctx.translate(screenX + this.width / 2, totalY);
+      ctx.rotate(this.tilt);
+      ctx.scale(this.direction >= 0 ? 1 : -1, 1 - this.squash);
+  
+      if (img && img.complete && img.naturalWidth > 0) {
+        ctx.drawImage(img, -this.width / 2, -this.height / 2, this.width, this.height);
+      } else {
+        ctx.fillStyle = '#F08030';
+        ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
       }
+  
+      ctx.restore();
     }
-
-    if (this.squash > 0) {
-      this.squashTimer++;
-      if (this.squashTimer > this.squashDuration) this.squash = 0;
-    }
-
-    this.walkTimer++;
   }
-
-  switchState() {
-    this.isWalking = !this.isWalking;
-    this.stateTimer = 0;
-    this.stateDuration = getRandomRange(200, 800);
-  }
-
-  draw(ctx, cameraX = 0) {
-    const img = this.sprite;
-    const screenX = Math.floor(this.worldX - cameraX);
-    const bob = this.isWalking ? Math.abs(Math.sin(this.walkTimer * this.swayAmplitude)) * this.bobAmplitude : 0;
-    const tilt = this.isWalking ? Math.sin(this.walkTimer * this.tiltSpeed) * this.tiltAmplitude : 0;
-
-    const baseY = canvas.height - this.height / 2;
-    const totalY = baseY - this.jumpHeight - bob;
-
-    ctx.save();
-    ctx.translate(screenX + this.width / 2, totalY);
-    ctx.rotate(tilt);
-    // scaleX: 1 when facing right, -1 when facing left
-    const scaleX = this.direction === 1 ? 1 : -1;
-    ctx.scale(scaleX, 1 - this.squash);
-
-    if (img && img.complete && img.naturalWidth > 0) {
-      ctx.drawImage(img, -this.width / 2, -this.height / 2, this.width, this.height);
-    } else {
-      ctx.fillStyle = '#FF6B6B';
-      ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
-    }
-    ctx.restore();
-  }
-}
+  
 
 // PetManager (single correct implementation)
 class PetManager {
