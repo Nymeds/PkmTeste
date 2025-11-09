@@ -1,4 +1,4 @@
-// pet.js (renderer) — com card de informações flutuante
+// pet.js (renderer) — com sistema de XP
 const { ipcRenderer } = require('electron');
 const fs = require('fs');
 const path = require('path');
@@ -54,8 +54,9 @@ function loadPokedex(dir = POKEDEX_DIR) {
 }
 
 class Pet {
-  constructor({ id, x = 0, speedBase = 1.2, spriteImg = null, stats = null }) {
+  constructor({ id, uuid, x = 0, speedBase = 1.2, spriteImg = null, stats = null, level = 1, xp = 0 }) {
     this.id = id ?? `pet-${Math.floor(Math.random() * 99999)}`;
+    this.uuid = uuid ?? this.id;
     this.worldX = x;
     this.direction = Math.random() < 0.5 ? 1 : -1;
     this.targetDirection = this.direction;
@@ -81,6 +82,50 @@ class Pet {
     this.sprite = spriteImg;
     this.stats = stats;
     this.persistent = false;
+
+    // Sistema de XP
+    this.level = level;
+    this.xp = xp;
+    this.xpToNextLevel = this.calculateXPToNextLevel();
+  }
+
+  calculateXPToNextLevel() {
+    // Fórmula: 100 * level (pode ajustar conforme necessário)
+    const baseXP = this.stats?.xpPerLevel || 100;
+    return baseXP * this.level;
+  }
+
+  gainXP(amount) {
+    this.xp += amount;
+    
+    // Verificar se subiu de nível
+    while (this.xp >= this.xpToNextLevel) {
+      this.levelUp();
+    }
+  }
+
+  levelUp() {
+    this.xp -= this.xpToNextLevel;
+    this.level++;
+    this.xpToNextLevel = this.calculateXPToNextLevel();
+    
+    console.log(`${this.id} subiu para o nível ${this.level}!`);
+    
+    // Aumentar stats baseado no crescimento do Pokémon
+    if (this.stats && this.stats.baseStats) {
+      const growth = {
+        hp: this.stats.hpGrowth || 5,
+        attack: this.stats.attackGrowth || 3,
+        defense: this.stats.defenseGrowth || 3,
+        speed: this.stats.speedGrowth || 2
+      };
+
+      for (const [stat, value] of Object.entries(growth)) {
+        if (this.stats.baseStats[stat]) {
+          this.stats.baseStats[stat] += value;
+        }
+      }
+    }
   }
 
   update() {
@@ -131,7 +176,6 @@ class Pet {
     ctx.save();
     ctx.translate(screenX + this.width / 2, totalY);
     ctx.rotate(this.tilt);
-    // Invertido: quando direction é positivo (direita), espelha a imagem
     ctx.scale(this.direction >= 0 ? -1 : 1, 1 - this.squash);
 
     if (img && img.complete && img.naturalWidth > 0) {
@@ -142,6 +186,31 @@ class Pet {
     }
 
     ctx.restore();
+
+    // Desenhar barra de XP para pets persistentes
+    if (this.persistent) {
+      const barWidth = this.width;
+      const barHeight = 4;
+      const barX = screenX;
+      const barY = totalY + this.height / 2 + 5;
+      
+      // Fundo da barra
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.fillRect(barX, barY, barWidth, barHeight);
+      
+      // XP atual
+      const xpPercent = this.xp / this.xpToNextLevel;
+      ctx.fillStyle = '#4CAF50';
+      ctx.fillRect(barX, barY, barWidth * xpPercent, barHeight);
+      
+      // Nível
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 10px Arial';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2;
+      ctx.strokeText(`Lv${this.level}`, barX, barY - 2);
+      ctx.fillText(`Lv${this.level}`, barX, barY - 2);
+    }
   }
 
   isMouseOver(mouseX, mouseY, cameraX = 0) {
@@ -167,6 +236,14 @@ class Pet {
     
     return { x: screenX, y: topY };
   }
+
+  getXPData() {
+    return {
+      uuid: this.uuid,
+      level: this.level,
+      xp: this.xp
+    };
+  }
 }
 
 class PetManager {
@@ -182,6 +259,31 @@ class PetManager {
     this.hoveredPet = null;
     this.loadPokedex(options.pokedexDir || POKEDEX_DIR);
     this.setupMouseTracking();
+    this.setupXPSystem();
+  }
+
+  setupXPSystem() {
+    // Ganhar XP a cada 3 segundos
+    setInterval(() => {
+      const persistentPets = this.pets.filter(p => p.persistent);
+      persistentPets.forEach(pet => {
+        pet.gainXP(5); // Ganhar 5 XP a cada 3 segundos
+      });
+    }, 3000);
+
+    // Salvar no banco a cada 20 segundos
+    setInterval(() => {
+      this.saveXPToDB();
+    }, 20000);
+  }
+
+  saveXPToDB() {
+    const persistentPets = this.pets.filter(p => p.persistent);
+    if (persistentPets.length === 0) return;
+
+    const xpData = persistentPets.map(pet => pet.getXPData());
+    ipcRenderer.send('save-xp', xpData);
+    console.log('XP salvo no banco de dados', xpData);
   }
 
   setupMouseTracking() {
@@ -219,10 +321,16 @@ class PetManager {
   showInfoCard(pet) {
     const petPos = pet.getScreenPosition(this.cameraX);
     
-    // Enviar coordenadas relativas ao canvas
-    // O main.js vai converter para coordenadas de tela
+    // Adicionar informações de XP aos stats
+    const statsWithXP = {
+      ...(pet.stats || {}),
+      level: pet.level,
+      xp: pet.xp,
+      xpToNextLevel: pet.xpToNextLevel
+    };
+    
     ipcRenderer.send('show-card', {
-      stats: pet.stats || {},
+      stats: statsWithXP,
       x: Math.round(petPos.x),
       y: Math.round(petPos.y),
       persistent: pet.persistent || false
@@ -232,8 +340,15 @@ class PetManager {
   updateInfoCardPosition(pet) {
     const petPos = pet.getScreenPosition(this.cameraX);
     
+    const statsWithXP = {
+      ...(pet.stats || {}),
+      level: pet.level,
+      xp: pet.xp,
+      xpToNextLevel: pet.xpToNextLevel
+    };
+    
     ipcRenderer.send('show-card', {
-      stats: pet.stats || {},
+      stats: statsWithXP,
       x: Math.round(petPos.x),
       y: Math.round(petPos.y),
       persistent: pet.persistent || false
@@ -266,10 +381,13 @@ class PetManager {
     const spriteImg = entry.imgObj || this.defaultImage;
     const pet = new Pet({
       id: opts.id ?? entry.id,
+      uuid: opts.uuid ?? opts.id,
       x: opts.x ?? getRandomRange(0, Math.max(0, WORLD_WIDTH - 80)),
       speedBase: opts.speedBase ?? 1.2,
       spriteImg,
-      stats: entry.stats
+      stats: entry.stats,
+      level: opts.level ?? 1,
+      xp: opts.xp ?? 0
     });
     if (opts.persistent) pet.persistent = true;
     if (typeof opts.direction === 'number') pet.direction = opts.direction;
@@ -303,9 +421,12 @@ class PetManager {
     }
     const pet = new Pet({
       id: config.id,
+      uuid: config.uuid,
       x: config.x ?? getRandomRange(0, WORLD_WIDTH - 80),
       speedBase: config.speedBase ?? 1.2,
-      spriteImg
+      spriteImg,
+      level: config.level ?? 1,
+      xp: config.xp ?? 0
     });
     this.pets.push(pet);
     return pet;
@@ -343,14 +464,28 @@ function startAutoRespawn() {
 
 ipcRenderer.on('persisted-pokemons', (evt, list) => {
   for (const p of list) {
-    manager.addPetFromPokedex(p.id, { id: p.uuid ?? p.id, x: 20, persistent: true });
+    manager.addPetFromPokedex(p.id, { 
+      id: p.uuid ?? p.id, 
+      uuid: p.uuid,
+      x: 20, 
+      persistent: true,
+      level: p.level ?? 1,
+      xp: p.xp ?? 0
+    });
   }
   if (list.length > 0) startAutoRespawn();
 });
 
 ipcRenderer.on('starter-selected', (evt, payload) => {
   if (payload && payload.species) {
-    manager.addPetFromPokedex(payload.species, { id: payload.uuid ?? payload.species, x: 20, persistent: true });
+    manager.addPetFromPokedex(payload.species, { 
+      id: payload.uuid ?? payload.species,
+      uuid: payload.uuid,
+      x: 20, 
+      persistent: true,
+      level: 1,
+      xp: 0
+    });
     startAutoRespawn();
   }
 });

@@ -1,4 +1,4 @@
-// main.js (com janela separada para o card de informações)
+// main.js (com sistema de XP)
 const { app, BrowserWindow, screen, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -119,7 +119,9 @@ function createWindow() {
           id: p.species,
           uuid: p.uuid,
           stats: (() => { try { return JSON.parse(p.stats || '{}'); } catch(e){ return {}; } })(),
-          imagePath: p.imagePath
+          imagePath: p.imagePath,
+          level: p.level,
+          xp: p.xp
         }));
         win.webContents.send('persisted-pokemons', payload);
       }
@@ -170,10 +172,7 @@ async function openStarterWindow() {
 
 ipcMain.on('show-card', (event, data) => {
   if (cardWin && !cardWin.isDestroyed() && win && !win.isDestroyed()) {
-    // Pegar a posição da janela principal
     const winBounds = win.getBounds();
-    
-    // Converter coordenadas relativas ao canvas para coordenadas de tela
     const screenX = winBounds.x + data.x;
     const screenY = winBounds.y + data.y;
     
@@ -189,6 +188,24 @@ ipcMain.on('show-card', (event, data) => {
 ipcMain.on('hide-card', (event) => {
   if (cardWin && !cardWin.isDestroyed()) {
     cardWin.webContents.send('hide-card');
+  }
+});
+
+// Handler para salvar XP no banco de dados
+ipcMain.on('save-xp', async (event, xpData) => {
+  try {
+    for (const data of xpData) {
+      await prisma.capturedPokemon.update({
+        where: { uuid: data.uuid },
+        data: {
+          level: data.level,
+          xp: data.xp
+        }
+      });
+    }
+    console.log('XP atualizado no banco de dados para', xpData.length, 'Pokémon(s)');
+  } catch (error) {
+    console.error('Erro ao salvar XP no banco de dados:', error);
   }
 });
 
@@ -209,6 +226,8 @@ ipcMain.on('select-starter', async (event, payload) => {
         stats: JSON.stringify(payload.stats || {}),
         imagePath: payload.imagePath ?? null,
         slot,
+        level: 1,
+        xp: 0,
         teamId: team.id
       }
     });
@@ -219,7 +238,9 @@ ipcMain.on('select-starter', async (event, payload) => {
         uuid: cp.uuid,
         stats: payload.stats,
         imageUrl: payload.imageUrl,
-        imagePath: payload.imagePath
+        imagePath: payload.imagePath,
+        level: 1,
+        xp: 0
       });
     }
 

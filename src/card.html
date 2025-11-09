@@ -50,6 +50,13 @@
       color: #333;
     }
 
+    .card-level {
+      font-size: 14px;
+      font-weight: bold;
+      color: #4CAF50;
+      margin-top: 2px;
+    }
+
     .card-types {
       font-size: 11px;
       color: #666;
@@ -62,6 +69,42 @@
       border-radius: 4px;
       margin-right: 4px;
       display: inline-block;
+    }
+
+    .card-xp {
+      margin-bottom: 8px;
+      margin-top: 4px;
+    }
+
+    .xp-label {
+      font-size: 10px;
+      color: #666;
+      margin-bottom: 2px;
+    }
+
+    .xp-bar {
+      background: #ddd;
+      height: 8px;
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .xp-fill {
+      background: linear-gradient(to right, #4CAF50, #8BC34A);
+      height: 100%;
+      transition: width 0.3s ease;
+    }
+
+    .xp-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 9px;
+      font-weight: bold;
+      color: #333;
+      text-shadow: 0 0 2px white;
     }
 
     .card-stats {
@@ -127,15 +170,33 @@
       const baseStats = stats.baseStats || {};
       const description = stats.description || 'Sem descrição disponível.';
       const color = stats.color || '#999';
+      const level = stats.level || 1;
+      const xp = stats.xp || 0;
+      const xpToNextLevel = stats.xpToNextLevel || 100;
 
       let html = `
         <div class="card-header" style="border-color: ${color};">
           <div class="card-name">${name}</div>
+          ${persistent ? `<div class="card-level">Nível ${level}</div>` : ''}
           <div class="card-types">
             ${types.map(t => `<span class="type-badge" style="background: ${color};">${t}</span>`).join('')}
           </div>
         </div>
       `;
+
+      // Mostrar barra de XP apenas para Pokémon persistentes
+      if (persistent) {
+        const xpPercent = (xp / xpToNextLevel) * 100;
+        html += `
+          <div class="card-xp">
+            <div class="xp-label">Experiência</div>
+            <div class="xp-bar">
+              <div class="xp-fill" style="width: ${xpPercent}%; background: ${color};"></div>
+              <div class="xp-text">${xp} / ${xpToNextLevel}</div>
+            </div>
+          </div>
+        `;
+      }
 
       if (Object.keys(baseStats).length > 0) {
         html += '<div class="card-stats">';
