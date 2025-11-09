@@ -16,6 +16,10 @@
   "author": "Seu Nome",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^31.7.7"
+    "electron": "^31.7.7",
+    "prisma": "^5.22.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0"
   }
 }

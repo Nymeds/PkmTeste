@@ -1,0 +1,61 @@
+<!-- chooseStarter.html (script embutido já suficiente) -->
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Escolha seu Inicial</title>
+  <style>
+    body { font-family: sans-serif; margin: 12px; }
+    .grid { display:flex; gap:12px; }
+    .card { width:120px; text-align:center; cursor:pointer; border:1px solid #ccc; padding:6px; border-radius:8px; background:#fff; }
+    .card img { width:100px; height:100px; object-fit:contain; }
+    .card.disabled { opacity: 0.5; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <h3>Escolha seu Pokémon Inicial</h3>
+  <div id="list" class="grid"></div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    function makeCard(entry) {
+      const div = document.createElement('div');
+      div.className = 'card';
+      const img = document.createElement('img');
+      img.src = entry.imageUrl || '';
+      const name = document.createElement('div');
+      name.innerText = entry.id;
+      div.appendChild(img);
+      div.appendChild(name);
+
+      div.addEventListener('click', () => {
+        // disable all cards to prevent double click
+        document.querySelectorAll('.card').forEach(c => c.classList.add('disabled'));
+        // send minimal payload
+        ipcRenderer.send('select-starter', {
+          id: entry.id,
+          imageUrl: entry.imageUrl,
+          imagePath: entry.imagePath,
+          stats: entry.stats
+        });
+      });
+      return div;
+    }
+
+    ipcRenderer.on('starter-list', (evt, list) => {
+      const cont = document.getElementById('list');
+      cont.innerHTML = '';
+      for (const e of list) cont.appendChild(makeCard(e));
+    });
+
+    ipcRenderer.invoke('read-pokedex').then(list => {
+      const cont = document.getElementById('list');
+      if (!cont.hasChildNodes()) {
+        const three = list.slice(0, 3);
+        for (const e of three) cont.appendChild(makeCard(e));
+      }
+    });
+  </script>
+</body>
+</html>
