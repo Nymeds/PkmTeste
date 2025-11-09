@@ -230,125 +230,45 @@ class PetManager {
   }
 
   showInfoCard(pet) {
-    const stats = pet.stats || {};
-    const name = stats.name || pet.id;
-    const types = stats.type || ['Unknown'];
-    const baseStats = stats.baseStats || {};
-    const description = stats.description || 'Sem descrição disponível.';
-    const color = stats.color || '#999';
-
-    let html = `
-      <div style="border-bottom: 2px solid ${color}; margin-bottom: 8px; padding-bottom: 6px;">
-        <div style="font-size: 16px; font-weight: bold; color: #333;">${name}</div>
-        <div style="font-size: 11px; color: #666; margin-top: 2px;">
-          ${types.map(t => `<span style="background: ${color}; color: white; padding: 2px 6px; border-radius: 4px; margin-right: 4px; display: inline-block;">${t}</span>`).join('')}
-        </div>
-      </div>
-    `;
-
-    if (Object.keys(baseStats).length > 0) {
-      html += '<div style="margin-bottom: 8px;">';
-      html += '<div style="font-weight: bold; color: #555; margin-bottom: 4px;">Stats:</div>';
-      for (const [stat, value] of Object.entries(baseStats)) {
-        const percentage = Math.min(100, (value / 150) * 100);
-        html += `
-          <div style="margin-bottom: 4px;">
-            <div style="font-size: 10px; color: #666; text-transform: uppercase;">${stat}: ${value}</div>
-            <div style="background: #ddd; height: 6px; border-radius: 3px; overflow: hidden;">
-              <div style="background: ${color}; height: 100%; width: ${percentage}%;"></div>
-            </div>
-          </div>
-        `;
-      }
-      html += '</div>';
-    }
-
-    html += `<div style="font-size: 11px; color: #555; font-style: italic; line-height: 1.4;">${description}</div>`;
-
-    if (pet.persistent) {
-      html += '<div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #ddd; font-size: 10px; color: #0066cc;">⭐ Seu Pokémon</div>';
-    }
-
-    infoCard.innerHTML = html;
-    infoCard.style.display = 'block';
-    this.updateInfoCardPosition(pet);
+    const rect = this.canvas.getBoundingClientRect();
+    const petPos = pet.getScreenPosition(this.cameraX);
     
-    // Fade in suave
-    setTimeout(() => {
-      infoCard.style.opacity = '1';
-    }, 10);
+    console.log('[pet.js] showInfoCard called for:', pet.id);
+    console.log('[pet.js] Canvas rect:', rect);
+    console.log('[pet.js] Pet position:', petPos);
+    
+    // Converter para coordenadas absolutas da tela
+    const x = rect.left + petPos.x - 125; // centralizar (card tem ~250px de largura)
+    const y = rect.top + petPos.y - 200; // posicionar acima (card tem ~180-200px de altura)
+    
+    console.log('[pet.js] Sending show-card with x:', x, 'y:', y);
+    
+    ipcRenderer.send('show-card', {
+      stats: pet.stats || {},
+      x: Math.round(x),
+      y: Math.round(y),
+      persistent: pet.persistent || false
+    });
   }
 
   updateInfoCardPosition(pet) {
-    // Obter dimensões do card
-    const currentDisplay = infoCard.style.display;
-    infoCard.style.display = 'block';
-    infoCard.style.visibility = 'hidden';
-    
-    const cardWidth = infoCard.offsetWidth;
-    const cardHeight = infoCard.offsetHeight;
-    
-    infoCard.style.display = currentDisplay;
-    infoCard.style.visibility = 'visible';
-    
-    // Obter posição do canvas na tela
     const rect = this.canvas.getBoundingClientRect();
-    
-    // Obter posição do topo da cabeça do pokemon (relativo ao canvas)
     const petPos = pet.getScreenPosition(this.cameraX);
     
-    console.log('[Card] Pet canvas position:', petPos);
-    console.log('[Card] Canvas rect:', rect);
+    const x = rect.left + petPos.x - 125;
+    const y = rect.top + petPos.y - 200;
     
-    // Converter para coordenadas absolutas da tela
-    const petAbsoluteX = rect.left + petPos.x;
-    const petAbsoluteY = rect.top + petPos.y;
-    
-    console.log('[Card] Pet absolute position:', { x: petAbsoluteX, y: petAbsoluteY });
-    
-    // Centralizar o card horizontalmente em relação ao pokemon
-    let cardX = petAbsoluteX - (cardWidth / 2);
-    
-    // Posicionar o card ACIMA da cabeça com margem de 10px
-    let cardY = petAbsoluteY - cardHeight - 10;
-    
-    console.log('[Card] Initial card position:', { x: cardX, y: cardY });
-    
-    // Ajustar para não sair da tela horizontalmente
-    const minX = 5;
-    const maxX = window.innerWidth - cardWidth - 5;
-    
-    if (cardX < minX) {
-      cardX = minX;
-    } else if (cardX > maxX) {
-      cardX = maxX;
-    }
-    
-    // Ajustar para não sair da tela verticalmente
-    const minY = 5;
-    const maxY = window.innerHeight - cardHeight - 5;
-    
-    if (cardY < minY) {
-      // Se não couber em cima, colocar embaixo do pokemon
-      cardY = petAbsoluteY + pet.height + 10;
-      console.log('[Card] Not enough space above, positioning below');
-    }
-    
-    if (cardY > maxY) {
-      cardY = maxY;
-    }
-    
-    console.log('[Card] Final card position:', { x: cardX, y: cardY });
-
-    infoCard.style.left = Math.round(cardX) + 'px';
-    infoCard.style.top = Math.round(cardY) + 'px';
+    ipcRenderer.send('show-card', {
+      stats: pet.stats || {},
+      x: Math.round(x),
+      y: Math.round(y),
+      persistent: pet.persistent || false
+    });
   }
 
   hideInfoCard() {
-    infoCard.style.opacity = '0';
-    setTimeout(() => {
-      infoCard.style.display = 'none';
-    }, 200);
+    console.log('[pet.js] hideInfoCard called');
+    ipcRenderer.send('hide-card');
   }
 
   loadPokedex(dir) {
@@ -428,15 +348,6 @@ class PetManager {
   draw() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.pets.forEach(p => p.draw(this.ctx, this.cameraX));
-    
-    // Debug: desenhar ponto no topo da cabeça do pokemon com hover
-    if (this.hoveredPet) {
-      const pos = this.hoveredPet.getScreenPosition(this.cameraX);
-      this.ctx.fillStyle = 'red';
-      this.ctx.beginPath();
-      this.ctx.arc(pos.x, pos.y, 5, 0, Math.PI * 2);
-      this.ctx.fill();
-    }
   }
   
   loop = () => { this.update(); this.draw(); requestAnimationFrame(this.loop); }

@@ -119,7 +119,11 @@
     const { ipcRenderer } = require('electron');
     const card = document.getElementById('card');
 
+    console.log('[card.html] Script loaded');
+
     ipcRenderer.on('display-card', (event, data) => {
+      console.log('[card.html] Received display-card:', data);
+      
       const { stats, x, y, persistent } = data;
       
       const name = stats.name || 'Unknown';
@@ -127,6 +131,8 @@
       const baseStats = stats.baseStats || {};
       const description = stats.description || 'Sem descrição disponível.';
       const color = stats.color || '#999';
+
+      console.log('[card.html] Building card HTML for:', name);
 
       let html = `
         <div class="card-header" style="border-color: ${color};">
@@ -163,11 +169,23 @@
       card.innerHTML = html;
       card.style.left = x + 'px';
       card.style.top = y + 'px';
-      card.classList.add('visible');
+      card.style.display = 'block';
+      
+      console.log('[card.html] Card positioned at:', x, y);
+      console.log('[card.html] Card display:', card.style.display);
+      
+      // Forçar opacity para 1 imediatamente
+      setTimeout(() => {
+        card.style.opacity = '1';
+        card.classList.add('visible');
+        console.log('[card.html] Card should be visible now');
+      }, 10);
     });
 
     ipcRenderer.on('hide-card', () => {
+      console.log('[card.html] Received hide-card');
       card.classList.remove('visible');
+      card.style.opacity = '0';
       setTimeout(() => {
         card.style.display = 'none';
       }, 200);

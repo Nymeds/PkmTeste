@@ -81,6 +81,13 @@ function createCardWindow() {
   cardWin.loadFile(path.join(__dirname, 'card.html'));
   cardWin.setIgnoreMouseEvents(true, { forward: true });
   
+  // Abrir DevTools para debug
+  cardWin.webContents.openDevTools({ mode: 'detach' });
+  
+  cardWin.webContents.on('did-finish-load', () => {
+    console.log('[main] Card window loaded successfully');
+  });
+  
   console.log('[main] Card window created');
 }
 
@@ -109,6 +116,9 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'index.html'));
   win.setIgnoreMouseEvents(false);
   win.setMenu(null);
+
+  // Abrir DevTools para debug
+  win.webContents.openDevTools({ mode: 'detach' });
 
   // Criar janela do card após a janela principal
   createCardWindow();
@@ -177,12 +187,17 @@ async function openStarterWindow() {
 
 // IPC para controlar o card de informações
 ipcMain.on('show-card', (event, data) => {
+  console.log('[main] Received show-card:', data);
   if (cardWin && !cardWin.isDestroyed()) {
+    console.log('[main] Sending to card window');
     cardWin.webContents.send('display-card', data);
+  } else {
+    console.log('[main] Card window not available!');
   }
 });
 
 ipcMain.on('hide-card', (event) => {
+  console.log('[main] Received hide-card');
   if (cardWin && !cardWin.isDestroyed()) {
     cardWin.webContents.send('hide-card');
   }
