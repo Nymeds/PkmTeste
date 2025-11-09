@@ -1,4 +1,4 @@
-// pet.js (renderer) — com sistema de captura
+// pet.js (renderer) — com sistema de captura com chance
 const { ipcRenderer } = require('electron');
 const fs = require('fs');
 const path = require('path');
@@ -23,11 +23,20 @@ function loadPokedex(dir = POKEDEX_DIR) {
       const name = ent.name;
       const pokemonDir = path.join(dir, name);
       const statsPath = path.join(pokemonDir, 'stats.json');
+      const dataPath = path.join(pokemonDir, 'data.json');
+      
       let stats = null;
       if (fs.existsSync(statsPath)) {
         try { stats = JSON.parse(fs.readFileSync(statsPath, 'utf8')); }
         catch (e) { console.error('Error parsing stats:', statsPath, e); }
       }
+      
+      let data = null;
+      if (fs.existsSync(dataPath)) {
+        try { data = JSON.parse(fs.readFileSync(dataPath, 'utf8')); }
+        catch (e) { console.error('Error parsing data:', dataPath, e); }
+      }
+      
       let imagePath = null;
       const tryNames = [`${name}.png`,`${name}.jpg`,`${name}.jpeg`,`${name}.webp`,'sprite.png','icon.png'];
       for (const f of tryNames) {
@@ -45,6 +54,8 @@ function loadPokedex(dir = POKEDEX_DIR) {
         id: name,
         dir: pokemonDir,
         stats,
+        data,
+        rarity: data?.rarity || 'common',
         imagePath,
         imageUrl: imagePath ? pathToFileURL(imagePath).href : null
       });
@@ -53,8 +64,20 @@ function loadPokedex(dir = POKEDEX_DIR) {
   return result;
 }
 
+// Calcular chance de captura baseado na raridade
+function getCaptureRate(rarity) {
+  const rates = {
+    'starter': 0.45,   // 45% de chance
+    'common': 0.60,    // 60% de chance
+    'uncommon': 0.40,  // 40% de chance
+    'rare': 0.25,      // 25% de chance
+    'legendary': 0.10  // 10% de chance
+  };
+  return rates[rarity] || 0.50; // 50% padrão
+}
+
 class Pet {
-  constructor({ id, uuid, x = 0, speedBase = 1.2, spriteImg = null, stats = null, level = 1, xp = 0 }) {
+  constructor({ id, uuid, x = 0, speedBase = 1.2, spriteImg = null, stats = null, level = 1, xp = 0, rarity = 'common' }) {
     this.id = id ?? `pet-${Math.floor(Math.random() * 99999)}`;
     this.uuid = uuid ?? this.id;
     this.worldX = x;
@@ -82,6 +105,7 @@ class Pet {
     this.sprite = spriteImg;
     this.stats = stats;
     this.persistent = false;
+    this.rarity = rarity;
 
     // Sistema de XP
     this.level = level;
@@ -92,6 +116,10 @@ class Pet {
     this.isBeingCaptured = false;
     this.captureProgress = 0;
     this.captureStartTime = 0;
+    this.captureAttempts = 0;
+    this.captureShakes = 0;
+    this.captureFailed = false;
+    this.captureSucceeded = false;
   }
 
   calculateXPToNextLevel() {
@@ -135,17 +163,40 @@ class Pet {
     this.isBeingCaptured = true;
     this.captureProgress = 0;
     this.captureStartTime = Date.now();
+    this.captureAttempts = 0;
+    this.captureShakes = 0;
+    this.captureFailed = false;
+    this.captureSucceeded = false;
     return true;
   }
 
   updateCapture(deltaTime) {
     if (!this.isBeingCaptured) return;
     
-    const captureSpeed = 0.3; // 0 a 1 em ~3.3 segundos
+    const captureSpeed = 0.25; // Progresso por segundo
     this.captureProgress += captureSpeed * (deltaTime / 1000);
     
-    if (this.captureProgress >= 1) {
-      this.captureProgress = 1;
+    // Simular "tremidas" da pokébola
+    const shakeInterval = 0.33; // A cada 33% de progresso
+    const currentShake = Math.floor(this.captureProgress / shakeInterval);
+    
+    if (currentShake > this.captureShakes && currentShake < 3) {
+      this.captureShakes = currentShake;
+      console.log(`Tremida ${this.captureShakes}/3...`);
+    }
+    
+    if (this.captureProgress >= 1 && !this.captureSucceeded && !this.captureFailed) {
+      // Momento de decidir se capturou ou não
+      const captureRate = getCaptureRate(this.rarity);
+      const success = Math.random() < captureRate;
+      
+      if (success) {
+        this.captureSucceeded = true;
+        console.log(`${this.id} capturado! (Chance: ${(captureRate * 100).toFixed(0)}%)`);
+      } else {
+        this.captureFailed = true;
+        console.log(`${this.id} escapou! (Chance era: ${(captureRate * 100).toFixed(0)}%)`);
+      }
     }
   }
 
@@ -153,6 +204,9 @@ class Pet {
     this.isBeingCaptured = false;
     this.captureProgress = 0;
     this.captureStartTime = 0;
+    this.captureShakes = 0;
+    this.captureFailed = false;
+    this.captureSucceeded = false;
   }
 
   update() {
@@ -225,16 +279,26 @@ class Pet {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
       ctx.fillRect(barX, barY, barWidth, barHeight);
       
-      // Progresso da captura
-      ctx.fillStyle = this.captureProgress >= 1 ? '#4CAF50' : '#FF9800';
-      ctx.fillRect(barX, barY, barWidth * this.captureProgress, barHeight);
+      // Cor baseada no status
+      let barColor = '#FF9800'; // Laranja (capturando)
+      if (this.captureSucceeded) barColor = '#4CAF50'; // Verde (sucesso)
+      if (this.captureFailed) barColor = '#f44336'; // Vermelho (falha)
       
-      // Texto "Capturando..."
+      // Progresso da captura
+      ctx.fillStyle = barColor;
+      ctx.fillRect(barX, barY, barWidth * Math.min(1, this.captureProgress), barHeight);
+      
+      // Texto de status
       ctx.fillStyle = '#fff';
       ctx.font = 'bold 10px Arial';
       ctx.strokeStyle = '#000';
       ctx.lineWidth = 3;
-      const text = this.captureProgress >= 1 ? 'Capturado!' : 'Capturando...';
+      
+      let text = 'Capturando...';
+      if (this.captureShakes > 0) text = `Tremendo... ${this.captureShakes}/3`;
+      if (this.captureSucceeded) text = 'Capturado!';
+      if (this.captureFailed) text = 'Escapou!';
+      
       const textWidth = ctx.measureText(text).width;
       ctx.strokeText(text, barX + (barWidth - textWidth) / 2, barY - 4);
       ctx.fillText(text, barX + (barWidth - textWidth) / 2, barY - 4);
@@ -279,7 +343,8 @@ class Pet {
       stats: this.stats,
       imagePath: this.sprite ? this.sprite.src : null,
       level: this.level,
-      xp: this.xp
+      xp: this.xp,
+      rarity: this.rarity
     };
   }
 }
@@ -353,7 +418,8 @@ class PetManager {
     
     if (pet.startCapture()) {
       this.capturingPet = pet;
-      console.log(`Iniciando captura de ${pet.id}...`);
+      const captureRate = getCaptureRate(pet.rarity);
+      console.log(`Iniciando captura de ${pet.id} (${pet.rarity}) - Chance: ${(captureRate * 100).toFixed(0)}%`);
       
       // Verificar progresso da captura
       const checkCapture = setInterval(() => {
@@ -362,9 +428,20 @@ class PetManager {
           return;
         }
 
-        if (pet.captureProgress >= 1) {
+        // Captura bem-sucedida
+        if (pet.captureSucceeded) {
           clearInterval(checkCapture);
-          this.completeCapture(pet);
+          setTimeout(() => {
+            this.completeCapture(pet);
+          }, 800);
+        }
+        
+        // Captura falhou
+        if (pet.captureFailed) {
+          clearInterval(checkCapture);
+          setTimeout(() => {
+            this.failCapture(pet);
+          }, 1200);
         }
       }, 100);
     }
@@ -384,7 +461,17 @@ class PetManager {
         this.pets.splice(index, 1);
       }
       this.capturingPet = null;
-    }, 1000);
+    }, 500);
+  }
+
+  failCapture(pet) {
+    console.log(`${pet.id} escapou!`);
+    
+    // Resetar o Pokémon para tentar novamente
+    setTimeout(() => {
+      pet.cancelCapture();
+      this.capturingPet = null;
+    }, 500);
   }
 
   cancelCapture() {
@@ -413,8 +500,7 @@ class PetManager {
         this.hoveredPet = foundPet;
         if (foundPet) {
           this.showInfoCard(foundPet);
-          // Mudar cursor para pointer em Pokémon selvagens
-          if (!foundPet.persistent) {
+          if (!foundPet.persistent && !foundPet.isBeingCaptured) {
             this.canvas.style.cursor = 'pointer';
           } else {
             this.canvas.style.cursor = 'default';
@@ -442,7 +528,8 @@ class PetManager {
       ...(pet.stats || {}),
       level: pet.level,
       xp: pet.xp,
-      xpToNextLevel: pet.xpToNextLevel
+      xpToNextLevel: pet.xpToNextLevel,
+      rarity: pet.rarity
     };
     
     ipcRenderer.send('show-card', {
@@ -461,7 +548,8 @@ class PetManager {
       ...(pet.stats || {}),
       level: pet.level,
       xp: pet.xp,
-      xpToNextLevel: pet.xpToNextLevel
+      xpToNextLevel: pet.xpToNextLevel,
+      rarity: pet.rarity
     };
     
     ipcRenderer.send('show-card', {
@@ -505,7 +593,8 @@ class PetManager {
       spriteImg,
       stats: entry.stats,
       level: opts.level ?? 1,
-      xp: opts.xp ?? 0
+      xp: opts.xp ?? 0,
+      rarity: entry.rarity
     });
     if (opts.persistent) pet.persistent = true;
     if (typeof opts.direction === 'number') pet.direction = opts.direction;
@@ -544,7 +633,8 @@ class PetManager {
       speedBase: config.speedBase ?? 1.2,
       spriteImg,
       level: config.level ?? 1,
-      xp: config.xp ?? 0
+      xp: config.xp ?? 0,
+      rarity: config.rarity ?? 'common'
     });
     this.pets.push(pet);
     return pet;
@@ -619,10 +709,8 @@ ipcRenderer.on('starter-selected', (evt, payload) => {
   }
 });
 
-// Listener para quando um Pokémon é capturado
 ipcRenderer.on('pokemon-captured', (evt, payload) => {
   console.log('Pokémon adicionado ao time:', payload);
-  // Adicionar o Pokémon capturado ao time
   manager.addPetFromPokedex(payload.species, {
     id: payload.uuid,
     uuid: payload.uuid,
