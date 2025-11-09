@@ -1,0 +1,14 @@
+{
+  "id": "charmander",
+  "name": "Charmander",
+  "baseStats": {
+    "hp": 39,
+    "attack": 52,
+    "defense": 43,
+    "speed": 65
+  },
+  "growthRate": "medium",
+  "type": ["fire"],
+  "description": "A chama em sua cauda indica sua força vital. Quando está fraco, a chama também enfraquece.",
+  "rarity": "starter"
+}

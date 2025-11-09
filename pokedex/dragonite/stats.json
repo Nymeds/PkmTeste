@@ -1,0 +1,14 @@
+{
+  "id": "dragonite",
+  "name": "Dragonite",
+  "baseStats": {
+    "hp": 91,
+    "attack": 134,
+    "defense": 95,
+    "speed": 80
+  },
+  "growthRate": "slow",
+  "type": ["dragon", "flying"],
+  "description": "Um Pokémon lendário extremamente raro. Dizem que é capaz de voar ao redor do mundo em 16 horas.",
+  "rarity": "rare"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "squirtle",
+  "name": "Squirtle",
+  "baseStats": {
+    "hp": 44,
+    "attack": 48,
+    "defense": 65,
+    "speed": 43
+  },
+  "growthRate": "medium",
+  "type": ["water"],
+  "description": "Quando retrai seu longo pescoço em sua concha, esguicha água com força vigorosa.",
+  "rarity": "starter"
+}
