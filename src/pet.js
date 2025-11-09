@@ -602,7 +602,7 @@ class PetManager {
     return pet;
   }
 
-  respawnRandomFromPokedex(count = 3) {
+  respawnRandomFromPokedex(count = 2) {
     const persistent = this.pets.filter(p => p.persistent);
     this.pets = [...persistent];
     if (this.pokedex.length === 0) {

@@ -1,6 +1,6 @@
 {
-  "name": "Dragonite",
-  "type": ["Dragon", "Flying"],
+  "name": "Bulbasaur",
+  "type": ["grass", "poison"],
   "baseStats": {
     "hp": 91,
     "attack": 134,
@@ -13,5 +13,5 @@
   "defenseGrowth": 4,
   "speedGrowth": 3,
   "color": "#F16E57",
-  "description": "Dragonite é capaz de circundar o globo em apenas 16 horas. É um Pokémon gentil, mas extremamente poderoso."
+  "description": "A semente nas costas cresce absorvendo nutrientes do corpo."
 }

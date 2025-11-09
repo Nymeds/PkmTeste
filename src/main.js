@@ -250,6 +250,65 @@ ipcMain.on('select-starter', async (event, payload) => {
     console.error('Erro criando registro no DB:', e);
   }
 });
+// Handler para captura enviada pelo renderer (pet.js)
+ipcMain.on('capture-pokemon', async (event, captureData) => {
+  try {
+    // Certifica que existe um time
+    let team = await prisma.team.findFirst();
+    if (!team) {
+      team = await prisma.team.create({ data: { name: 'PlayerTeam' } });
+    }
+
+    // Pegar slots já usados e escolher um disponível (1..6)
+    const existing = await prisma.capturedPokemon.findMany({ where: { teamId: team.id }, orderBy: { slot: 'asc' } });
+    const usedSlots = existing.map(e => e.slot);
+    let slot = 1;
+    for (; slot <= 6; slot++) if (!usedSlots.includes(slot)) break;
+    if (slot > 6) slot = 6; // fallback: se cheio, usa slot 6 (ou adapte conforme quiser)
+
+    // Normalizar dados vindos do renderer
+    const species = captureData.species ?? 'unknown';
+    const statsObj = captureData.stats ?? {};
+    const statsJson = JSON.stringify(statsObj);
+    const imagePath = captureData.imagePath ?? null;
+    const level = Number.isFinite(captureData.level) ? captureData.level : 1;
+    const xp = Number.isFinite(captureData.xp) ? captureData.xp : 0;
+
+    // Criar o registro no DB
+    const cp = await prisma.capturedPokemon.create({
+      data: {
+        species,
+        stats: statsJson,
+        imagePath,
+        slot,
+        level,
+        xp,
+        teamId: team.id
+      }
+    });
+
+    console.log('Pokemon salvo no DB:', cp.species, cp.uuid);
+
+    // Enviar pro renderer para ele adicionar à lista (o pet.js escuta 'pokemon-captured')
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('pokemon-captured', {
+        species: cp.species,
+        uuid: cp.uuid,
+        level: cp.level,
+        xp: cp.xp,
+        imagePath: cp.imagePath ?? null,
+        imageUrl: cp.imagePath ? pathToFileURL(cp.imagePath).href : null,
+        stats: statsObj
+      });
+    }
+  } catch (error) {
+    console.error('Erro ao salvar captura no DB:', error);
+    // opcional: enviar um event de erro pro renderer se quiser feedback visual
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('pokemon-capture-error', { message: error.message || 'Erro desconhecido' });
+    }
+  }
+});
 
 ipcMain.handle('read-pokedex', async () => readPokedex());
 
