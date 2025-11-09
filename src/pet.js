@@ -1,4 +1,4 @@
-// pet.js (renderer) — com sistema de XP
+// pet.js (renderer) — com sistema de captura
 const { ipcRenderer } = require('electron');
 const fs = require('fs');
 const path = require('path');
@@ -87,10 +87,14 @@ class Pet {
     this.level = level;
     this.xp = xp;
     this.xpToNextLevel = this.calculateXPToNextLevel();
+
+    // Sistema de captura
+    this.isBeingCaptured = false;
+    this.captureProgress = 0;
+    this.captureStartTime = 0;
   }
 
   calculateXPToNextLevel() {
-    // Fórmula: 100 * level (pode ajustar conforme necessário)
     const baseXP = this.stats?.xpPerLevel || 100;
     return baseXP * this.level;
   }
@@ -98,7 +102,6 @@ class Pet {
   gainXP(amount) {
     this.xp += amount;
     
-    // Verificar se subiu de nível
     while (this.xp >= this.xpToNextLevel) {
       this.levelUp();
     }
@@ -111,7 +114,6 @@ class Pet {
     
     console.log(`${this.id} subiu para o nível ${this.level}!`);
     
-    // Aumentar stats baseado no crescimento do Pokémon
     if (this.stats && this.stats.baseStats) {
       const growth = {
         hp: this.stats.hpGrowth || 5,
@@ -128,6 +130,31 @@ class Pet {
     }
   }
 
+  startCapture() {
+    if (this.persistent || this.isBeingCaptured) return false;
+    this.isBeingCaptured = true;
+    this.captureProgress = 0;
+    this.captureStartTime = Date.now();
+    return true;
+  }
+
+  updateCapture(deltaTime) {
+    if (!this.isBeingCaptured) return;
+    
+    const captureSpeed = 0.3; // 0 a 1 em ~3.3 segundos
+    this.captureProgress += captureSpeed * (deltaTime / 1000);
+    
+    if (this.captureProgress >= 1) {
+      this.captureProgress = 1;
+    }
+  }
+
+  cancelCapture() {
+    this.isBeingCaptured = false;
+    this.captureProgress = 0;
+    this.captureStartTime = 0;
+  }
+
   update() {
     this.idleTimer++;
     if (this.idleTimer > this.idleDuration) {
@@ -139,14 +166,14 @@ class Pet {
 
     this.direction += (this.targetDirection - this.direction) * 0.1;
 
-    if (this.isWalking) {
+    if (this.isWalking && !this.isBeingCaptured) {
       this.worldX += this.speed * this.direction;
       const max = WORLD_WIDTH - this.width;
       if (this.worldX < 0) { this.worldX = 0; this.targetDirection = 1; }
       if (this.worldX > max) { this.worldX = max; this.targetDirection = -1; }
     }
 
-    if (!this.isJumping && Math.random() < 0.005) {
+    if (!this.isJumping && Math.random() < 0.005 && !this.isBeingCaptured) {
       this.isJumping = true;
       this.jumpVelocity = this.jumpStrength * getRandomRange(0.8, 1.2);
     }
@@ -187,29 +214,30 @@ class Pet {
 
     ctx.restore();
 
-    // Desenhar barra de XP para pets persistentes
-    if (this.persistent) {
+    // Barra de captura
+    if (this.isBeingCaptured && this.captureProgress > 0) {
       const barWidth = this.width;
-      const barHeight = 4;
+      const barHeight = 6;
       const barX = screenX;
-      const barY = totalY + this.height / 2 + 5;
+      const barY = totalY - this.height / 2 - 15;
       
       // Fundo da barra
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
       ctx.fillRect(barX, barY, barWidth, barHeight);
       
-      // XP atual
-      const xpPercent = this.xp / this.xpToNextLevel;
-      ctx.fillStyle = '#4CAF50';
-      ctx.fillRect(barX, barY, barWidth * xpPercent, barHeight);
+      // Progresso da captura
+      ctx.fillStyle = this.captureProgress >= 1 ? '#4CAF50' : '#FF9800';
+      ctx.fillRect(barX, barY, barWidth * this.captureProgress, barHeight);
       
-      // Nível
+      // Texto "Capturando..."
       ctx.fillStyle = '#fff';
       ctx.font = 'bold 10px Arial';
       ctx.strokeStyle = '#000';
-      ctx.lineWidth = 2;
-      ctx.strokeText(`Lv${this.level}`, barX, barY - 2);
-      ctx.fillText(`Lv${this.level}`, barX, barY - 2);
+      ctx.lineWidth = 3;
+      const text = this.captureProgress >= 1 ? 'Capturado!' : 'Capturando...';
+      const textWidth = ctx.measureText(text).width;
+      ctx.strokeText(text, barX + (barWidth - textWidth) / 2, barY - 4);
+      ctx.fillText(text, barX + (barWidth - textWidth) / 2, barY - 4);
     }
   }
 
@@ -244,6 +272,16 @@ class Pet {
       xp: this.xp
     };
   }
+
+  getCaptureData() {
+    return {
+      species: this.id,
+      stats: this.stats,
+      imagePath: this.sprite ? this.sprite.src : null,
+      level: this.level,
+      xp: this.xp
+    };
+  }
 }
 
 class PetManager {
@@ -257,21 +295,22 @@ class PetManager {
     this.defaultImage.src = options.defaultSprite ? pathToFileURL(options.defaultSprite).href : pathToFileURL(DEFAULT_SPRITE).href;
     this._started = false;
     this.hoveredPet = null;
+    this.capturingPet = null;
+    this.lastFrameTime = Date.now();
     this.loadPokedex(options.pokedexDir || POKEDEX_DIR);
     this.setupMouseTracking();
+    this.setupClickHandler();
     this.setupXPSystem();
   }
 
   setupXPSystem() {
-    // Ganhar XP a cada 3 segundos
     setInterval(() => {
       const persistentPets = this.pets.filter(p => p.persistent);
       persistentPets.forEach(pet => {
-        pet.gainXP(5); // Ganhar 5 XP a cada 3 segundos
+        pet.gainXP(5);
       });
     }, 3000);
 
-    // Salvar no banco a cada 20 segundos
     setInterval(() => {
       this.saveXPToDB();
     }, 20000);
@@ -284,6 +323,76 @@ class PetManager {
     const xpData = persistentPets.map(pet => pet.getXPData());
     ipcRenderer.send('save-xp', xpData);
     console.log('XP salvo no banco de dados', xpData);
+  }
+
+  setupClickHandler() {
+    this.canvas.addEventListener('click', (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      // Verificar se clicou em algum Pokémon selvagem
+      for (const pet of this.pets) {
+        if (!pet.persistent && pet.isMouseOver(mouseX, mouseY, this.cameraX)) {
+          this.startCapture(pet);
+          break;
+        }
+      }
+    });
+
+    // Cancelar captura ao pressionar ESC
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.capturingPet) {
+        this.cancelCapture();
+      }
+    });
+  }
+
+  startCapture(pet) {
+    if (this.capturingPet) return; // Já está capturando outro
+    
+    if (pet.startCapture()) {
+      this.capturingPet = pet;
+      console.log(`Iniciando captura de ${pet.id}...`);
+      
+      // Verificar progresso da captura
+      const checkCapture = setInterval(() => {
+        if (!this.capturingPet || this.capturingPet !== pet) {
+          clearInterval(checkCapture);
+          return;
+        }
+
+        if (pet.captureProgress >= 1) {
+          clearInterval(checkCapture);
+          this.completeCapture(pet);
+        }
+      }, 100);
+    }
+  }
+
+  completeCapture(pet) {
+    console.log(`${pet.id} capturado com sucesso!`);
+    
+    // Enviar dados para salvar no banco
+    const captureData = pet.getCaptureData();
+    ipcRenderer.send('capture-pokemon', captureData);
+    
+    // Remover o Pokémon selvagem
+    setTimeout(() => {
+      const index = this.pets.indexOf(pet);
+      if (index > -1) {
+        this.pets.splice(index, 1);
+      }
+      this.capturingPet = null;
+    }, 1000);
+  }
+
+  cancelCapture() {
+    if (this.capturingPet) {
+      console.log('Captura cancelada!');
+      this.capturingPet.cancelCapture();
+      this.capturingPet = null;
+    }
   }
 
   setupMouseTracking() {
@@ -304,8 +413,15 @@ class PetManager {
         this.hoveredPet = foundPet;
         if (foundPet) {
           this.showInfoCard(foundPet);
+          // Mudar cursor para pointer em Pokémon selvagens
+          if (!foundPet.persistent) {
+            this.canvas.style.cursor = 'pointer';
+          } else {
+            this.canvas.style.cursor = 'default';
+          }
         } else {
           this.hideInfoCard();
+          this.canvas.style.cursor = 'default';
         }
       } else if (foundPet) {
         this.updateInfoCardPosition(foundPet);
@@ -315,13 +431,13 @@ class PetManager {
     this.canvas.addEventListener('mouseleave', () => {
       this.hoveredPet = null;
       this.hideInfoCard();
+      this.canvas.style.cursor = 'default';
     });
   }
 
   showInfoCard(pet) {
     const petPos = pet.getScreenPosition(this.cameraX);
     
-    // Adicionar informações de XP aos stats
     const statsWithXP = {
       ...(pet.stats || {}),
       level: pet.level,
@@ -333,7 +449,8 @@ class PetManager {
       stats: statsWithXP,
       x: Math.round(petPos.x),
       y: Math.round(petPos.y),
-      persistent: pet.persistent || false
+      persistent: pet.persistent || false,
+      capturable: !pet.persistent && !pet.isBeingCaptured
     });
   }
 
@@ -351,7 +468,8 @@ class PetManager {
       stats: statsWithXP,
       x: Math.round(petPos.x),
       y: Math.round(petPos.y),
-      persistent: pet.persistent || false
+      persistent: pet.persistent || false,
+      capturable: !pet.persistent && !pet.isBeingCaptured
     });
   }
 
@@ -436,7 +554,18 @@ class PetManager {
     for (let i = 0; i < count; i++) this.addPet({ id: `pet-${Date.now()}-${i}`, x: getRandomRange(0, WORLD_WIDTH - 80), speedBase: getRandomRange(0.6, 1.6) });
   }
 
-  update() { this.pets.forEach(p => p.update()); }
+  update() {
+    const currentTime = Date.now();
+    const deltaTime = currentTime - this.lastFrameTime;
+    this.lastFrameTime = currentTime;
+
+    this.pets.forEach(p => {
+      p.update();
+      if (p.isBeingCaptured) {
+        p.updateCapture(deltaTime);
+      }
+    });
+  }
   
   draw() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -488,6 +617,20 @@ ipcRenderer.on('starter-selected', (evt, payload) => {
     });
     startAutoRespawn();
   }
+});
+
+// Listener para quando um Pokémon é capturado
+ipcRenderer.on('pokemon-captured', (evt, payload) => {
+  console.log('Pokémon adicionado ao time:', payload);
+  // Adicionar o Pokémon capturado ao time
+  manager.addPetFromPokedex(payload.species, {
+    id: payload.uuid,
+    uuid: payload.uuid,
+    x: 20,
+    persistent: true,
+    level: payload.level,
+    xp: payload.xp
+  });
 });
 
 manager.start();
