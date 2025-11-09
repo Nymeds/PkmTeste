@@ -136,7 +136,7 @@ class Pet {
     // dados do pokemon (do stats.json)
     this.stats = stats;
   }
-
+  
   update() {
     this.stateTimer++;
     if (this.stateTimer > this.stateDuration) this.switchState();
@@ -202,7 +202,7 @@ class Pet {
 
     ctx.save();
     ctx.translate(screenX + this.width / 2, totalY);
-    ctx.scale(this.direction === -1 ? -1 : 1, 1 - this.squash);
+    ctx.scale(this.direction === 1 ? -1 : 1, 1 - this.squash);
 
     if (img && img.complete && img.naturalWidth > 0) {
       ctx.drawImage(img, -this.width / 2, -this.height / 2, this.width, this.height);
@@ -234,7 +234,28 @@ class PetManager {
     // carregamento inicial da pokedex
     this.loadPokedex(options.pokedexDir || POKEDEX_DIR);
   }
-
+  // remove todos os pets e cria novos aleatórios da pokedex
+respawnRandomFromPokedex(count = 3) {
+    this.pets = []; // limpa pets atuais
+  
+    if (this.pokedex.length === 0) {
+      // fallback se não houver pokedex carregada
+      this.spawnRandom(count);
+      return;
+    }
+  
+    // escolhe aleatoriamente 'count' pokémons da pokedex
+    const shuffled = [...this.pokedex].sort(() => Math.random() - 0.5);
+    const selected = shuffled.slice(0, count);
+  
+    for (const entry of selected) {
+      this.addPetFromPokedex(entry.id, {
+        id: entry.id,
+        x: getRandomRange(0, Math.max(0, WORLD_WIDTH - 80))
+      });
+    }
+  }
+  
   // carrega a pokedex para this.pokedex (sincrono)
   loadPokedex(dir) {
     this.pokedex = loadPokedex(dir);
@@ -351,18 +372,17 @@ class PetManager {
 // ------------------------------------------------------------------
 const manager = new PetManager(canvas, ctx);
 
-// se houver pokedex carregada, spawn de exemplo: um pet por entrada
-if (manager.pokedex.length > 0) {
-  // por padrão, cria 1 pet por pokedex (opcional: trocar para spawnAllFromPokedex())
-  manager.spawnAllFromPokedex(); // cria todos os pokemons cadastrados
-} else {
-  // fallback antigo
-  manager.addPet({ x: 50 });
-  manager.addPet({ x: 200, speedBase: 1.3 });
-  manager.spawnRandom(2);
-}
+// spawn inicial
+manager.respawnRandomFromPokedex(3); // começa com 3 aleatórios
 
 manager.start();
+
+// troca os pets a cada 30 segundos
+setInterval(() => {
+  const qtd = Math.floor(getRandomRange(2, 6)); // 2 a 5 pokémons
+  manager.respawnRandomFromPokedex(qtd);
+  console.log(`[petManager] Respawned ${qtd} new pokemons!`);
+}, 30_000); // 30 segundos (30.000 ms)
 
 // expõe pra debug/manipulação pela console
 window.petManager = manager;
