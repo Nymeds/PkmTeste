@@ -238,8 +238,9 @@ class PetManager {
     console.log('[pet.js] Pet position:', petPos);
     
     // Converter para coordenadas absolutas da tela
-    const x = rect.left + petPos.x - 125; // centralizar (card tem ~250px de largura)
-    const y = rect.top + petPos.y - 200; // posicionar acima (card tem ~180-200px de altura)
+    // petPos.x já é o centro do pokemon, petPos.y é o topo
+    const x = rect.left + petPos.x;
+    const y = rect.top + petPos.y;
     
     console.log('[pet.js] Sending show-card with x:', x, 'y:', y);
     

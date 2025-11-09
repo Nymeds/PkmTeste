@@ -167,19 +167,29 @@
       }
 
       card.innerHTML = html;
-      card.style.left = x + 'px';
-      card.style.top = y + 'px';
-      card.style.display = 'block';
       
-      console.log('[card.html] Card positioned at:', x, y);
-      console.log('[card.html] Card display:', card.style.display);
-      
-      // Forçar opacity para 1 imediatamente
-      setTimeout(() => {
-        card.style.opacity = '1';
-        card.classList.add('visible');
-        console.log('[card.html] Card should be visible now');
-      }, 10);
+      // Aguardar o DOM atualizar para obter a altura real do card
+      requestAnimationFrame(() => {
+        const cardHeight = card.offsetHeight;
+        const cardWidth = card.offsetWidth;
+        
+        // Posicionar acima do pokemon com espaçamento
+        const finalX = Math.max(0, x - (cardWidth / 2));
+        const finalY = Math.max(0, y - cardHeight - 10); // 10px de espaçamento
+        
+        card.style.left = finalX + 'px';
+        card.style.top = finalY + 'px';
+        card.style.display = 'block';
+        
+        console.log('[card.html] Card positioned at:', finalX, finalY, 'card size:', cardWidth, cardHeight);
+        
+        // Forçar opacity para 1 imediatamente
+        setTimeout(() => {
+          card.style.opacity = '1';
+          card.classList.add('visible');
+          console.log('[card.html] Card should be visible now');
+        }, 10);
+      });
     });
 
     ipcRenderer.on('hide-card', () => {
