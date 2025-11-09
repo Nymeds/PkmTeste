@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Pokémon Companion</title>
+  <style>
+    body {
+      background: transparent;
+      margin: 0;
+      overflow: hidden;
+    }
+
+    #pokemon {
+      position: absolute;
+      width: 128px;
+      height: 128px;
+      animation: walk 1s steps(4) infinite;
+    }
+
+    @keyframes walk {
+      from { transform: translateX(0); }
+      to { transform: translateX(10px); }
+    }
+  </style>
+</head>
+<body>
+  <img id="pokemon" />
+  <script src="overlay.js"></script>
+</body>
+</html>

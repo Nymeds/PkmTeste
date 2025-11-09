@@ -1,31 +1,12 @@
 {
-  "name": "pokemon-desktop-pet",
-  "version": "2.0.0",
-  "description": "Pokémon Desktop Pets com sistema de níveis e experiência",
+  "name": "pkm-teste",
+  "version": "1.0.0",
+  "description": "Pokémon Pet Desktop",
   "main": "src/main/main.js",
   "scripts": {
-    "start": "electron .",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio",
-    "prisma:setup": "prisma migrate dev --name init && prisma generate",
-    "setup": "npm install && npm run prisma:setup"
+    "start": "electron ."
   },
-  "keywords": [
-    "electron",
-    "desktop-pet",
-    "pokemon",
-    "mascot",
-    "prisma"
-  ],
-  "author": "Seu Nome",
-  "license": "MIT",
   "dependencies": {
-    "@prisma/client": "^5.20.0",
-    "electron-store": "^8.2.0"
-  },
-  "devDependencies": {
-    "electron": "^31.7.7",
-    "prisma": "^5.20.0"
+    "electron": "^31.0.0"
   }
 }

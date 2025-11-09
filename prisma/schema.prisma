@@ -4,25 +4,12 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  url      = "file:./pokemon.db"
 }
 
 model TeamPokemon {
-  id        Int      @id @default(autoincrement()) // slot do time
+  id        Int      @id @default(autoincrement())
   uuid      String   @default(uuid())
-  name      String
-  level     Int      @default(1)
-  xp        Int      @default(0)
-  hp        Int
-  maxHp     Int
-  attack    Int
-  defense   Int
-  speed     Int
-  createdAt DateTime @default(now())
-}
-
-model Pokemon {
-  uuid      String   @default(uuid()) @id
   name      String
   level     Int      @default(1)
   xp        Int      @default(0)
