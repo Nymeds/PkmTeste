@@ -15,31 +15,6 @@ const DEFAULT_SPRITE = path.join(__dirname, '..', 'pet.png');
 const POKEDEX_DIR = path.join(__dirname, '..', 'pokedex');
 const WORLD_WIDTH = canvas.width;
 
-// Criar elemento para o card de informações
-const infoCard = document.createElement('div');
-infoCard.id = 'pokemon-info-card';
-infoCard.style.cssText = `
-  position: fixed;
-  background: rgba(255, 255, 255, 0.95);
-  border: 2px solid #333;
-  border-radius: 12px;
-  padding: 12px;
-  font-family: 'Arial', sans-serif;
-  font-size: 12px;
-  pointer-events: none;
-  display: none;
-  z-index: 9999;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  min-width: 180px;
-  max-width: 250px;
-  overflow: visible;
-`;
-document.body.appendChild(infoCard);
-
-// Garantir que o body não corta elementos
-document.body.style.overflow = 'visible';
-document.documentElement.style.overflow = 'visible';
-
 // util
 function getRandomRange(min, max) { return Math.random() * (max - min) + min; }
 
@@ -197,7 +172,11 @@ class Pet {
     const bob = Math.sin(this.walkTimer * 0.1) * (this.isWalking ? 2 : 0);
     const baseY = canvas.height - this.height / 2;
     const totalY = baseY - this.jumpHeight - bob;
-    return { x: screenX, y: totalY - this.height / 2 - 10 };
+    
+    // Retornar a posição do TOPO da cabeça do pokemon (não o centro)
+    const topY = totalY - this.height / 2;
+    
+    return { x: screenX, y: topY };
   }
 }
 
@@ -234,12 +213,13 @@ class PetManager {
       if (foundPet !== this.hoveredPet) {
         this.hoveredPet = foundPet;
         if (foundPet) {
-          this.showInfoCard(foundPet, e.clientX, e.clientY);
+          this.showInfoCard(foundPet);
         } else {
           this.hideInfoCard();
         }
       } else if (foundPet) {
-        this.updateInfoCardPosition(e.clientX, e.clientY);
+        // Atualizar posição do card seguindo o pokemon
+        this.updateInfoCardPosition(foundPet);
       }
     });
 
@@ -249,7 +229,7 @@ class PetManager {
     });
   }
 
-  showInfoCard(pet, mouseX, mouseY) {
+  showInfoCard(pet) {
     const stats = pet.stats || {};
     const name = stats.name || pet.id;
     const types = stats.type || ['Unknown'];
@@ -291,48 +271,84 @@ class PetManager {
 
     infoCard.innerHTML = html;
     infoCard.style.display = 'block';
-    this.updateInfoCardPosition(mouseX, mouseY);
+    this.updateInfoCardPosition(pet);
+    
+    // Fade in suave
+    setTimeout(() => {
+      infoCard.style.opacity = '1';
+    }, 10);
   }
 
-  updateInfoCardPosition(mouseX, mouseY) {
-    const offset = 15;
-    
-    // Forçar o card a renderizar primeiro para obter dimensões corretas
+  updateInfoCardPosition(pet) {
+    // Obter dimensões do card
+    const currentDisplay = infoCard.style.display;
     infoCard.style.display = 'block';
     infoCard.style.visibility = 'hidden';
     
     const cardWidth = infoCard.offsetWidth;
     const cardHeight = infoCard.offsetHeight;
     
+    infoCard.style.display = currentDisplay;
     infoCard.style.visibility = 'visible';
     
-    let x = mouseX + offset;
-    let y = mouseY + offset;
-
-    // Ajustar para não sair da tela
-    const maxX = window.innerWidth - cardWidth - 10;
-    const maxY = window.innerHeight - cardHeight - 10;
+    // Obter posição do canvas na tela
+    const rect = this.canvas.getBoundingClientRect();
     
-    if (x > maxX) {
-      x = mouseX - cardWidth - offset;
-    }
-    if (x < 10) {
-      x = 10;
+    // Obter posição do topo da cabeça do pokemon (relativo ao canvas)
+    const petPos = pet.getScreenPosition(this.cameraX);
+    
+    console.log('[Card] Pet canvas position:', petPos);
+    console.log('[Card] Canvas rect:', rect);
+    
+    // Converter para coordenadas absolutas da tela
+    const petAbsoluteX = rect.left + petPos.x;
+    const petAbsoluteY = rect.top + petPos.y;
+    
+    console.log('[Card] Pet absolute position:', { x: petAbsoluteX, y: petAbsoluteY });
+    
+    // Centralizar o card horizontalmente em relação ao pokemon
+    let cardX = petAbsoluteX - (cardWidth / 2);
+    
+    // Posicionar o card ACIMA da cabeça com margem de 10px
+    let cardY = petAbsoluteY - cardHeight - 10;
+    
+    console.log('[Card] Initial card position:', { x: cardX, y: cardY });
+    
+    // Ajustar para não sair da tela horizontalmente
+    const minX = 5;
+    const maxX = window.innerWidth - cardWidth - 5;
+    
+    if (cardX < minX) {
+      cardX = minX;
+    } else if (cardX > maxX) {
+      cardX = maxX;
     }
     
-    if (y > maxY) {
-      y = mouseY - cardHeight - offset;
+    // Ajustar para não sair da tela verticalmente
+    const minY = 5;
+    const maxY = window.innerHeight - cardHeight - 5;
+    
+    if (cardY < minY) {
+      // Se não couber em cima, colocar embaixo do pokemon
+      cardY = petAbsoluteY + pet.height + 10;
+      console.log('[Card] Not enough space above, positioning below');
     }
-    if (y < 10) {
-      y = 10;
+    
+    if (cardY > maxY) {
+      cardY = maxY;
     }
+    
+    console.log('[Card] Final card position:', { x: cardX, y: cardY });
 
-    infoCard.style.left = x + 'px';
-    infoCard.style.top = y + 'px';
+    infoCard.style.left = Math.round(cardX) + 'px';
+    infoCard.style.top = Math.round(cardY) + 'px';
   }
 
   hideInfoCard() {
-    infoCard.style.display = 'none';
+    infoCard.style.opacity = '0';
+    setTimeout(() => {
+      infoCard.style.display = 'none';
+    }, 200);
   }
 
   loadPokedex(dir) {
@@ -412,6 +428,15 @@ class PetManager {
   draw() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.pets.forEach(p => p.draw(this.ctx, this.cameraX));
+    
+    // Debug: desenhar ponto no topo da cabeça do pokemon com hover
+    if (this.hoveredPet) {
+      const pos = this.hoveredPet.getScreenPosition(this.cameraX);
+      this.ctx.fillStyle = 'red';
+      this.ctx.beginPath();
+      this.ctx.arc(pos.x, pos.y, 5, 0, Math.PI * 2);
+      this.ctx.fill();
+    }
   }
   
   loop = () => { this.update(); this.draw(); requestAnimationFrame(this.loop); }

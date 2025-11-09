@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Pokemon Card</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: transparent;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #card {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.95);
+      border: 2px solid #333;
+      border-radius: 12px;
+      padding: 12px;
+      font-family: 'Arial', sans-serif;
+      font-size: 12px;
+      display: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      min-width: 180px;
+      max-width: 250px;
+      transition: left 0.1s ease-out, top 0.1s ease-out, opacity 0.2s ease-in-out;
+      opacity: 0;
+    }
+
+    #card.visible {
+      display: block;
+      opacity: 1;
+    }
+
+    .card-header {
+      border-bottom: 2px solid #999;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+    }
+
+    .card-name {
+      font-size: 16px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    .card-types {
+      font-size: 11px;
+      color: #666;
+      margin-top: 2px;
+    }
+
+    .type-badge {
+      color: white;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-right: 4px;
+      display: inline-block;
+    }
+
+    .card-stats {
+      margin-bottom: 8px;
+    }
+
+    .stats-title {
+      font-weight: bold;
+      color: #555;
+      margin-bottom: 4px;
+    }
+
+    .stat-item {
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: #666;
+      text-transform: uppercase;
+    }
+
+    .stat-bar {
+      background: #ddd;
+      height: 6px;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .stat-fill {
+      background: #999;
+      height: 100%;
+    }
+
+    .card-description {
+      font-size: 11px;
+      color: #555;
+      font-style: italic;
+      line-height: 1.4;
+    }
+
+    .card-persistent {
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px solid #ddd;
+      font-size: 10px;
+      color: #0066cc;
+    }
+  </style>
+</head>
+<body>
+  <div id="card"></div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+    const card = document.getElementById('card');
+
+    ipcRenderer.on('display-card', (event, data) => {
+      const { stats, x, y, persistent } = data;
+      
+      const name = stats.name || 'Unknown';
+      const types = stats.type || ['Unknown'];
+      const baseStats = stats.baseStats || {};
+      const description = stats.description || 'Sem descrição disponível.';
+      const color = stats.color || '#999';
+
+      let html = `
+        <div class="card-header" style="border-color: ${color};">
+          <div class="card-name">${name}</div>
+          <div class="card-types">
+            ${types.map(t => `<span class="type-badge" style="background: ${color};">${t}</span>`).join('')}
+          </div>
+        </div>
+      `;
+
+      if (Object.keys(baseStats).length > 0) {
+        html += '<div class="card-stats">';
+        html += '<div class="stats-title">Stats:</div>';
+        for (const [stat, value] of Object.entries(baseStats)) {
+          const percentage = Math.min(100, (value / 150) * 100);
+          html += `
+            <div class="stat-item">
+              <div class="stat-label">${stat}: ${value}</div>
+              <div class="stat-bar">
+                <div class="stat-fill" style="background: ${color}; width: ${percentage}%;"></div>
+              </div>
+            </div>
+          `;
+        }
+        html += '</div>';
+      }
+
+      html += `<div class="card-description">${description}</div>`;
+
+      if (persistent) {
+        html += '<div class="card-persistent">⭐ Seu Pokémon</div>';
+      }
+
+      card.innerHTML = html;
+      card.style.left = x + 'px';
+      card.style.top = y + 'px';
+      card.classList.add('visible');
+    });
+
+    ipcRenderer.on('hide-card', () => {
+      card.classList.remove('visible');
+      setTimeout(() => {
+        card.style.display = 'none';
+      }, 200);
+    });
+  </script>
+</body>
+</html>

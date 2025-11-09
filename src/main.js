@@ -1,4 +1,4 @@
-// main.js (ajustado para permitir card flutuante)
+// main.js (com janela separada para o card de informações)
 const { app, BrowserWindow, screen, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -10,6 +10,7 @@ const prisma = new PrismaClient();
 try { require('@electron/remote/main').initialize(); } catch (e) {}
 
 let win = null;
+let cardWin = null;
 let starterWin = null;
 
 const POKEDEX_DIR = path.join(__dirname, '..', 'pokedex');
@@ -56,6 +57,33 @@ function readPokedex(dir = POKEDEX_DIR) {
   return list;
 }
 
+function createCardWindow() {
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  
+  cardWin = new BrowserWindow({
+    width: width,
+    height: height,
+    x: 0,
+    y: 0,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    resizable: false,
+    hasShadow: false,
+    skipTaskbar: true,
+    focusable: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    }
+  });
+
+  cardWin.loadFile(path.join(__dirname, 'card.html'));
+  cardWin.setIgnoreMouseEvents(true, { forward: true });
+  
+  console.log('[main] Card window created');
+}
+
 function createWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   const windowWidth = 480, windowHeight = 120;
@@ -74,19 +102,16 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-      enableRemoteModule: true,
-      // Permitir que elementos flutuantes saiam da janela
-      webviewTag: false
+      enableRemoteModule: true
     }
   });
 
   win.loadFile(path.join(__dirname, 'index.html'));
-  
-  // IMPORTANTE: Não bloquear eventos do mouse completamente
-  // Isso permite que o hover funcione, mas clicks passam através
   win.setIgnoreMouseEvents(false);
-  
   win.setMenu(null);
+
+  // Criar janela do card após a janela principal
+  createCardWindow();
 
   win.webContents.on('did-finish-load', async () => {
     try {
@@ -149,6 +174,19 @@ async function openStarterWindow() {
     starterWin.webContents.send('starter-list', starters.slice(0, 3));
   });
 }
+
+// IPC para controlar o card de informações
+ipcMain.on('show-card', (event, data) => {
+  if (cardWin && !cardWin.isDestroyed()) {
+    cardWin.webContents.send('display-card', data);
+  }
+});
+
+ipcMain.on('hide-card', (event) => {
+  if (cardWin && !cardWin.isDestroyed()) {
+    cardWin.webContents.send('hide-card');
+  }
+});
 
 ipcMain.on('select-starter', async (event, payload) => {
   try {
