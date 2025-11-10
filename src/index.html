@@ -1,3 +1,4 @@
+<!-- index.html - Corrigido -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 
@@ -25,13 +26,10 @@ html, body {
 /* Ajuste do canvas para comportar múltiplos pets */
 canvas {
   position: absolute;
-  bottom: 20px;
+  bottom: 20;
   left: 0;
   background: transparent;
-  /* ← REMOVIDO: image-rendering: pixelated; */
-  /* Para GIFs animados, use: */
-  image-rendering: auto;
-  image-rendering: -webkit-optimize-contrast;
+  image-rendering: pixelated; /* Para sprites pixelados ficarem nítidos */
 }
 
 /* Garantir que elementos flutuantes não sejam cortados */
@@ -43,6 +41,7 @@ canvas {
 </head>
 
 <body>
+<!-- Aqui definimos um canvas maior para poder exibir múltiplos pets. Pode mudar width/height se quiser -->
 <canvas id="petCanvas" width="480" height="120"></canvas>
 <script src="pet.js"></script>
 </body>
