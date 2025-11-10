@@ -1,4 +1,4 @@
-// main.js (com sistema de XP)
+// main.js (com sistema de captura)
 const { app, BrowserWindow, screen, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -32,7 +32,7 @@ function readPokedex(dir = POKEDEX_DIR) {
     }
 
     let imagePath = null;
-    const candidates = [`${name}.png`, `${name}.jpg`, `${name}.jpeg`, `${name}.webp`, 'sprite.png', 'icon.png'];
+    const candidates = [`${name}.gif`, `${name}.png`, `${name}.jpg`, `${name}.jpeg`, `${name}.webp`, 'sprite.gif', 'sprite.png', 'icon.gif', 'icon.png'];
     for (const f of candidates) {
       const p = path.join(pokemonDir, f);
       if (fs.existsSync(p)) { imagePath = p; break; }
@@ -42,7 +42,7 @@ function readPokedex(dir = POKEDEX_DIR) {
       const files = fs.readdirSync(pokemonDir);
       for (const f of files) {
         const lower = f.toLowerCase();
-        if (/\.(png|jpg|jpeg|webp)$/i.test(lower)) { imagePath = path.join(pokemonDir, f); break; }
+        if (/\.(gif|png|jpg|jpeg|webp)$/i.test(lower)) { imagePath = path.join(pokemonDir, f); break; }
       }
     }
 
@@ -180,7 +180,8 @@ ipcMain.on('show-card', (event, data) => {
       stats: data.stats,
       x: screenX,
       y: screenY,
-      persistent: data.persistent
+      persistent: data.persistent,
+      capturable: data.capturable
     });
   }
 });
@@ -206,6 +207,67 @@ ipcMain.on('save-xp', async (event, xpData) => {
     console.log('XP atualizado no banco de dados para', xpData.length, 'Pokémon(s)');
   } catch (error) {
     console.error('Erro ao salvar XP no banco de dados:', error);
+  }
+});
+
+// Handler para capturar Pokémon selvagem
+ipcMain.on('capture-pokemon', async (event, captureData) => {
+  try {
+    let team = await prisma.team.findFirst({ include: { capturedPokemons: true } });
+    if (!team) {
+      team = await prisma.team.create({ data: { name: 'PlayerTeam' } });
+    }
+
+    // Verificar se já tem 6 Pokémon no time
+    const teamCount = await prisma.capturedPokemon.count({ where: { teamId: team.id } });
+    if (teamCount >= 6) {
+      console.log('Time cheio! Máximo de 6 Pokémon.');
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('capture-failed', { reason: 'team-full' });
+      }
+      return;
+    }
+
+    // Encontrar próximo slot disponível
+    const existing = await prisma.capturedPokemon.findMany({ 
+      where: { teamId: team.id }, 
+      orderBy: { slot: 'asc' } 
+    });
+    const usedSlots = existing.map(e => e.slot);
+    let slot = 1;
+    for (; slot <= 6; slot++) {
+      if (!usedSlots.includes(slot)) break;
+    }
+
+    // Criar o Pokémon capturado
+    const captured = await prisma.capturedPokemon.create({
+      data: {
+        species: captureData.species,
+        stats: JSON.stringify(captureData.stats || {}),
+        imagePath: captureData.imagePath ?? null,
+        slot,
+        level: captureData.level || 1,
+        xp: captureData.xp || 0,
+        teamId: team.id
+      }
+    });
+
+    console.log(`${captureData.species} capturado e adicionado ao time!`);
+
+    // Notificar o renderer
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('pokemon-captured', {
+        species: captured.species,
+        uuid: captured.uuid,
+        stats: captureData.stats,
+        imagePath: captured.imagePath,
+        level: captured.level,
+        xp: captured.xp
+      });
+    }
+
+  } catch (error) {
+    console.error('Erro ao capturar Pokémon:', error);
   }
 });
 
@@ -248,65 +310,6 @@ ipcMain.on('select-starter', async (event, payload) => {
 
   } catch (e) {
     console.error('Erro criando registro no DB:', e);
-  }
-});
-// Handler para captura enviada pelo renderer (pet.js)
-ipcMain.on('capture-pokemon', async (event, captureData) => {
-  try {
-    // Certifica que existe um time
-    let team = await prisma.team.findFirst();
-    if (!team) {
-      team = await prisma.team.create({ data: { name: 'PlayerTeam' } });
-    }
-
-    // Pegar slots já usados e escolher um disponível (1..6)
-    const existing = await prisma.capturedPokemon.findMany({ where: { teamId: team.id }, orderBy: { slot: 'asc' } });
-    const usedSlots = existing.map(e => e.slot);
-    let slot = 1;
-    for (; slot <= 6; slot++) if (!usedSlots.includes(slot)) break;
-    if (slot > 6) slot = 6; // fallback: se cheio, usa slot 6 (ou adapte conforme quiser)
-
-    // Normalizar dados vindos do renderer
-    const species = captureData.species ?? 'unknown';
-    const statsObj = captureData.stats ?? {};
-    const statsJson = JSON.stringify(statsObj);
-    const imagePath = captureData.imagePath ?? null;
-    const level = Number.isFinite(captureData.level) ? captureData.level : 1;
-    const xp = Number.isFinite(captureData.xp) ? captureData.xp : 0;
-
-    // Criar o registro no DB
-    const cp = await prisma.capturedPokemon.create({
-      data: {
-        species,
-        stats: statsJson,
-        imagePath,
-        slot,
-        level,
-        xp,
-        teamId: team.id
-      }
-    });
-
-    console.log('Pokemon salvo no DB:', cp.species, cp.uuid);
-
-    // Enviar pro renderer para ele adicionar à lista (o pet.js escuta 'pokemon-captured')
-    if (win && !win.isDestroyed()) {
-      win.webContents.send('pokemon-captured', {
-        species: cp.species,
-        uuid: cp.uuid,
-        level: cp.level,
-        xp: cp.xp,
-        imagePath: cp.imagePath ?? null,
-        imageUrl: cp.imagePath ? pathToFileURL(cp.imagePath).href : null,
-        stats: statsObj
-      });
-    }
-  } catch (error) {
-    console.error('Erro ao salvar captura no DB:', error);
-    // opcional: enviar um event de erro pro renderer se quiser feedback visual
-    if (win && !win.isDestroyed()) {
-      win.webContents.send('pokemon-capture-error', { message: error.message || 'Erro desconhecido' });
-    }
   }
 });
 

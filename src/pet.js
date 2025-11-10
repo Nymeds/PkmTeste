@@ -40,16 +40,35 @@ function loadPokedex(dir = POKEDEX_DIR) {
       }
       
       let imagePath = null;
-      const tryNames = [`${name}.png`,`${name}.jpg`,`${name}.jpeg`,`${name}.webp`,'sprite.png','icon.png'];
+      const tryNames = [
+        `${name}.gif`,      // ← PRIORIDADE: GIF com nome do pokémon
+        `${name}.png`,
+        `${name}.jpg`,
+        `${name}.jpeg`,
+        `${name}.webp`,
+        'sprite.gif',       // ← Segunda prioridade: sprite.gif
+        'sprite.png',
+        'icon.gif',         // ← Terceira prioridade: icon.gif
+        'icon.png'
+      ];
+      
       for (const f of tryNames) {
         const p = path.join(pokemonDir, f);
-        if (fs.existsSync(p)) { imagePath = p; break; }
+        if (fs.existsSync(p)) { 
+          imagePath = p; 
+          break; 
+        }
       }
+      
       if (!imagePath) {
         const files = fs.readdirSync(pokemonDir);
         for (const f of files) {
           const lower = f.toLowerCase();
-          if (/\.(png|jpg|jpeg|webp)$/i.test(lower)) { imagePath = path.join(pokemonDir, f); break; }
+          // ← IMPORTANTE: Adicionar .gif no regex
+          if (/\.(gif|png|jpg|jpeg|webp)$/i.test(lower)) { 
+            imagePath = path.join(pokemonDir, f); 
+            break; 
+          }
         }
       }
       result.push({
@@ -261,9 +280,18 @@ class Pet {
     ctx.rotate(this.tilt);
     ctx.scale(this.direction >= 0 ? -1 : 1, 1 - this.squash);
 
-    if (img && img.complete && img.naturalWidth > 0) {
-      ctx.drawImage(img, -this.width / 2, -this.height / 2, this.width, this.height);
+    // ← MUDANÇA AQUI: Remover a verificação de img.complete para GIFs
+    if (img && img.src) {
+      try {
+        // GIFs animados funcionam automaticamente no canvas!
+        ctx.drawImage(img, -this.width / 2, -this.height / 2, this.width, this.height);
+      } catch (e) {
+        // Fallback se der erro ao desenhar
+        ctx.fillStyle = '#F08030';
+        ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
+      }
     } else {
+      // Placeholder enquanto carrega
       ctx.fillStyle = '#F08030';
       ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
     }
