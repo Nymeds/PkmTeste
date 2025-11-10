@@ -1,4 +1,4 @@
-// pet.js (renderer) — com suporte a GIFs animados via <img> DOM overlay
+// pet.js (renderer) — com sistema de captura com chance
 const { ipcRenderer } = require('electron');
 const fs = require('fs');
 const path = require('path');
@@ -40,7 +40,7 @@ function loadPokedex(dir = POKEDEX_DIR) {
       }
       
       let imagePath = null;
-      const tryNames = [`${name}.png`,`${name}.jpg`,`${name}.jpeg`,`${name}.webp`, 'sprite.png','icon.png','sprite.gif'];
+      const tryNames = [`${name}.png`,`${name}.jpg`,`${name}.jpeg`,`${name}.webp`,'sprite.png','icon.png'];
       for (const f of tryNames) {
         const p = path.join(pokemonDir, f);
         if (fs.existsSync(p)) { imagePath = p; break; }
@@ -49,7 +49,7 @@ function loadPokedex(dir = POKEDEX_DIR) {
         const files = fs.readdirSync(pokemonDir);
         for (const f of files) {
           const lower = f.toLowerCase();
-          if (/\.(png|jpg|jpeg|webp|gif)$/i.test(lower)) { imagePath = path.join(pokemonDir, f); break; }
+          if (/\.(png|jpg|jpeg|webp)$/i.test(lower)) { imagePath = path.join(pokemonDir, f); break; }
         }
       }
       result.push({
@@ -78,11 +78,6 @@ function getCaptureRate(rarity) {
   return rates[rarity] || 0.50; // 50% padrão
 }
 
-function isGifSrc(src) {
-  if (!src) return false;
-  return /\.gif(\?.*)?$/i.test(src);
-}
-
 class Pet {
   constructor({ id, uuid, x = 0, speedBase = 1.2, spriteImg = null, stats = null, level = 1, xp = 0, rarity = 'common' }) {
     this.id = id ?? `pet-${Math.floor(Math.random() * 99999)}`;
@@ -109,7 +104,7 @@ class Pet {
     this.height = 80;
     this.squash = 0;
     this.tilt = 0;
-    this.sprite = spriteImg; // Image object
+    this.sprite = spriteImg;
     this.stats = stats;
     this.persistent = false;
     this.rarity = rarity;
@@ -127,46 +122,7 @@ class Pet {
     this.captureShakes = 0;
     this.captureFailed = false;
     this.captureSucceeded = false;
-
-    // DOM overlay for GIFs (if needed)
-    this.domSprite = null;
-    this.usesDomSprite = false;
-    if (this.sprite && this.sprite.src && isGifSrc(this.sprite.src)) {
-      this.createDomSprite(this.sprite.src);
-    }
   }
-
-  // ---- DOM sprite helpers for GIFs ----
-  createDomSprite(src) {
-    try {
-      const img = document.createElement('img');
-      img.src = src;
-      img.style.position = 'absolute';
-      img.style.pointerEvents = 'none'; // let canvas receive mouse events
-      img.style.width = `${this.width}px`;
-      img.style.height = `${this.height}px`;
-      img.style.transformOrigin = 'center center';
-      img.style.willChange = 'transform, left, top';
-      img.style.zIndex = 9999;
-      img.alt = this.id;
-      document.body.appendChild(img);
-      this.domSprite = img;
-      this.usesDomSprite = true;
-    } catch (e) {
-      console.warn('Erro criando dom sprite', e);
-      this.domSprite = null;
-      this.usesDomSprite = false;
-    }
-  }
-
-  destroyDomSprite() {
-    if (this.domSprite && this.domSprite.parentNode) {
-      this.domSprite.parentNode.removeChild(this.domSprite);
-      this.domSprite = null;
-      this.usesDomSprite = false;
-    }
-  }
-  // -------------------------------------
 
   calculateXPToNextLevel() {
     const baseXP = this.stats?.xpPerLevel || 100;
@@ -293,37 +249,12 @@ class Pet {
     this.walkTimer++;
   }
 
-  // centraliza cálculo do baseY para manter consistência
-  computeBaseY() {
-    return canvas.height - this.height / 2 - POKEMON_GROUND_OFFSET;
-  }
-
   draw(ctx, cameraX = 0) {
     const img = this.sprite;
     const screenX = Math.floor(this.worldX - cameraX);
     const bob = Math.sin(this.walkTimer * 0.1) * (this.isWalking ? 2 : 0);
-    const baseY = this.computeBaseY();
+    const baseY = canvas.height - this.height / 2 - POKEMON_GROUND_OFFSET;
     const totalY = baseY - this.jumpHeight - bob;
-
-    // If we're using a DOM gif sprite, update its position and transform
-    if (this.usesDomSprite && this.domSprite) {
-      const left = Math.round(screenX + this.width / 2 - this.width / 2);
-      const top = Math.round(totalY - this.height / 2);
-      this.domSprite.style.left = `${left}px`;
-      this.domSprite.style.top = `${top}px`;
-      this.domSprite.style.width = `${this.width}px`;
-      this.domSprite.style.height = `${this.height}px`;
-
-      // Compose transform: flip horizontally if needed, rotate by tilt and squash
-      const flip = this.direction >= 0 ? -1 : 1; // match canvas flip
-      const rotateDeg = (this.tilt || 0) * (180 / Math.PI); // tilt rad -> deg
-      const scaleY = 1 - this.squash;
-      // Use translate to keep transform origin center (we already positioned left/top at top-left)
-      const translateX = this.width / 2;
-      const translateY = this.height / 2;
-      this.domSprite.style.transform = `translate(${translateX}px, ${translateY}px) rotate(${rotateDeg}deg) scale(${flip}, ${scaleY}) translate(${-translateX}px, ${-translateY}px)`;
-      return; // don't draw on canvas
-    }
 
     ctx.save();
     ctx.translate(screenX + this.width / 2, totalY);
@@ -379,7 +310,7 @@ class Pet {
   isMouseOver(mouseX, mouseY, cameraX = 0) {
     const screenX = this.worldX - cameraX;
     const bob = Math.sin(this.walkTimer * 0.1) * (this.isWalking ? 2 : 0);
-    const baseY = this.computeBaseY();
+    const baseY = canvas.height - this.height / 2;
     const totalY = baseY - this.jumpHeight - bob;
 
     const left = screenX;
@@ -393,7 +324,7 @@ class Pet {
   getScreenPosition(cameraX = 0) {
     const screenX = this.worldX - cameraX + this.width / 2;
     const bob = Math.sin(this.walkTimer * 0.1) * (this.isWalking ? 2 : 0);
-    const baseY = this.computeBaseY();
+    const baseY = canvas.height - this.height / 2;
     const totalY = baseY - this.jumpHeight - bob;
     const topY = totalY - this.height / 2;
     
@@ -525,9 +456,12 @@ class PetManager {
     const captureData = pet.getCaptureData();
     ipcRenderer.send('capture-pokemon', captureData);
     
-    // Remover o Pokémon selvagem (limpa DOM sprite se houver)
+    // Remover o Pokémon selvagem
     setTimeout(() => {
-      this.removePet(pet);
+      const index = this.pets.indexOf(pet);
+      if (index > -1) {
+        this.pets.splice(index, 1);
+      }
       this.capturingPet = null;
     }, 500);
   }
@@ -672,10 +606,6 @@ class PetManager {
 
   respawnRandomFromPokedex(count = 2) {
     const persistent = this.pets.filter(p => p.persistent);
-    // destroy dom sprites from pets that won't persist
-    for (const p of this.pets) {
-      if (!p.persistent) p.destroyDomSprite();
-    }
     this.pets = [...persistent];
     if (this.pokedex.length === 0) {
       this.spawnRandom(count);
@@ -714,14 +644,6 @@ class PetManager {
 
   spawnRandom(count = 1) {
     for (let i = 0; i < count; i++) this.addPet({ id: `pet-${Date.now()}-${i}`, x: getRandomRange(0, WORLD_WIDTH - 80), speedBase: getRandomRange(0.6, 1.6) });
-  }
-
-  removePet(pet) {
-    try {
-      pet.destroyDomSprite();
-    } catch (e) {}
-    const idx = this.pets.indexOf(pet);
-    if (idx > -1) this.pets.splice(idx, 1);
   }
 
   update() {
