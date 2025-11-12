@@ -707,6 +707,10 @@ class PetManager {
     const entry = this.pokedex.find(p => p.id.toLowerCase() === String(name).toLowerCase());
     if (!entry) return null;
     const spriteImg = entry.imgObj || this.defaultImage;
+    
+    // Check if the sprite is a GIF
+    const isGif = entry.imagePath && entry.imagePath.toLowerCase().endsWith('.gif');
+    
     const pet = new Pet({
       id: opts.id ?? entry.id,
       uuid: opts.uuid ?? opts.id,
@@ -716,7 +720,8 @@ class PetManager {
       stats: entry.stats,
       level: opts.level ?? 1,
       xp: opts.xp ?? 0,
-      rarity: entry.rarity
+      rarity: entry.rarity,
+      isGif: isGif
     });
     if (opts.persistent) pet.persistent = true;
     if (typeof opts.direction === 'number') pet.direction = opts.direction;
