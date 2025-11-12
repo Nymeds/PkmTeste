@@ -88,7 +88,7 @@ function getCaptureRate(rarity) {
 }
 
 class Pet {
-  constructor({ id, uuid, x = 0, speedBase = 1.2, spriteImg = null, stats = null, level = 1, xp = 0, rarity = 'common' }) {
+  constructor({ id, uuid, x = 0, speedBase = 1.2, spriteImg = null, stats = null, level = 1, xp = 0, rarity = 'common', isGif = false }) {
     this.id = id ?? `pet-${Math.floor(Math.random() * 99999)}`;
     this.uuid = uuid ?? this.id;
     this.worldX = x;
@@ -112,8 +112,8 @@ class Pet {
     this.jumpStrength = 4.5;
     this.isJumping = false;
 
-    this.width = 80;
-    this.height = 80;
+    this.width = 64;
+    this.height = 64;
     this.squash = 0;
     this.stretch = 0;
     this.tilt = 0;
@@ -122,6 +122,14 @@ class Pet {
     this.stats = stats;
     this.persistent = false;
     this.rarity = rarity;
+
+    // GIF handling
+    this.isGif = isGif;
+    this.gifElement = null;
+    
+    if (this.isGif && spriteImg) {
+      this.createGifElement();
+    }
 
     // Sistema de XP
     this.level = level;
@@ -136,6 +144,27 @@ class Pet {
     this.captureShakes = 0;
     this.captureFailed = false;
     this.captureSucceeded = false;
+  }
+
+  createGifElement() {
+    this.gifElement = document.createElement('img');
+    this.gifElement.src = this.sprite.src;
+    this.gifElement.style.position = 'absolute';
+    this.gifElement.style.width = this.width + 'px';
+    this.gifElement.style.height = this.height + 'px';
+    this.gifElement.style.pointerEvents = 'none';
+    this.gifElement.style.imageRendering = 'auto';
+    this.gifElement.style.transformOrigin = 'center center';
+    this.gifElement.style.zIndex = '1000';
+    this.gifElement.dataset.petId = this.uuid;
+    document.body.appendChild(this.gifElement);
+  }
+
+  destroyGifElement() {
+    if (this.gifElement && this.gifElement.parentNode) {
+      this.gifElement.parentNode.removeChild(this.gifElement);
+      this.gifElement = null;
+    }
   }
 
   calculateXPToNextLevel() {
