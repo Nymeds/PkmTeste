@@ -746,13 +746,21 @@ class PetManager {
 
   addPet(config = {}) {
     let spriteImg = this.defaultImage;
+    let isGif = false;
+    
     if (config.sprite) {
       try {
         spriteImg = new Image();
-        if (fs.existsSync(config.sprite)) spriteImg.src = pathToFileURL(config.sprite).href;
-        else spriteImg.src = config.sprite;
+        if (fs.existsSync(config.sprite)) {
+          spriteImg.src = pathToFileURL(config.sprite).href;
+          isGif = config.sprite.toLowerCase().endsWith('.gif');
+        } else {
+          spriteImg.src = config.sprite;
+          isGif = config.sprite.toLowerCase().endsWith('.gif');
+        }
       } catch (e) { spriteImg = this.defaultImage; }
     }
+    
     const pet = new Pet({
       id: config.id,
       uuid: config.uuid,
@@ -761,7 +769,8 @@ class PetManager {
       spriteImg,
       level: config.level ?? 1,
       xp: config.xp ?? 0,
-      rarity: config.rarity ?? 'common'
+      rarity: config.rarity ?? 'common',
+      isGif: isGif
     });
     this.pets.push(pet);
     return pet;
