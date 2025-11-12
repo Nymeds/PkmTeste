@@ -735,6 +735,15 @@ class PetManager {
 
   respawnRandomFromPokedex(count = 2) {
     const persistent = this.pets.filter(p => p.persistent);
+    const removed = this.pets.filter(p => !p.persistent);
+    
+    // Clean up GIF elements for removed pets
+    removed.forEach(pet => {
+      if (pet.gifElement) {
+        pet.destroyGifElement();
+      }
+    });
+    
     this.pets = [...persistent];
     if (this.pokedex.length === 0) {
       this.spawnRandom(count);
