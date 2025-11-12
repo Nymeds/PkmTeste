@@ -226,41 +226,86 @@ class Pet {
   }
 
   update() {
+    // Idle/Walk state management
     this.idleTimer++;
     if (this.idleTimer > this.idleDuration) {
       this.isWalking = !this.isWalking;
       this.idleTimer = 0;
       this.idleDuration = getRandomRange(200, 900);
-      if (this.isWalking) this.direction = Math.random() < 0.5 ? 1 : -1;
-    }
-
-    this.direction += (this.targetDirection - this.direction) * 0.1;
-
-    if (this.isWalking && !this.isBeingCaptured) {
-      this.worldX += this.speed * this.direction;
-      const max = WORLD_WIDTH - this.width;
-      if (this.worldX < 0) { this.worldX = 0; this.targetDirection = 1; }
-      if (this.worldX > max) { this.worldX = max; this.targetDirection = -1; }
-    }
-
-    if (!this.isJumping && Math.random() < 0.005 && !this.isBeingCaptured) {
-      this.isJumping = true;
-      this.jumpVelocity = this.jumpStrength * getRandomRange(0.8, 1.2);
-    }
-
-    if (this.isJumping) {
-      this.jumpVelocity += this.gravity;
-      this.jumpHeight += this.jumpVelocity;
-      if (this.jumpHeight >= 0) {
-        this.jumpHeight = 0;
-        this.isJumping = false;
-        this.squash = 0.25;
+      if (this.isWalking) {
+        this.targetDirection = Math.random() < 0.5 ? 1 : -1;
       }
     }
 
-    this.squash *= 0.8;
-    this.tilt = Math.sin(this.walkTimer * 0.2) * 0.05 * (this.isWalking ? 1 : 0);
-    this.walkTimer++;
+    // Smooth direction transitions with turn animation
+    const dirDiff = this.targetDirection - this.direction;
+    if (Math.abs(dirDiff) > 0.1) {
+      this.turnProgress = Math.min(1, this.turnProgress + 0.15);
+      this.direction += dirDiff * 0.15;
+    } else {
+      this.direction = this.targetDirection;
+      this.turnProgress *= 0.9;
+    }
+
+    // Smooth acceleration and deceleration
+    if (this.isWalking && !this.isBeingCaptured) {
+      this.currentSpeed += (this.speed - this.currentSpeed) * this.acceleration;
+      this.worldX += this.currentSpeed * this.direction;
+      
+      const max = WORLD_WIDTH - this.width;
+      if (this.worldX < 0) { 
+        this.worldX = 0; 
+        this.targetDirection = 1;
+        this.currentSpeed *= 0.5; // Bounce effect
+      }
+      if (this.worldX > max) { 
+        this.worldX = max; 
+        this.targetDirection = -1;
+        this.currentSpeed *= 0.5; // Bounce effect
+      }
+    } else {
+      // Decelerate when idle
+      this.currentSpeed *= (1 - this.deceleration);
+      if (Math.abs(this.currentSpeed) < 0.01) this.currentSpeed = 0;
+    }
+
+    // Random jump with better timing
+    if (!this.isJumping && Math.random() < 0.006 && !this.isBeingCaptured && this.isWalking) {
+      this.isJumping = true;
+      this.jumpVelocity = -this.jumpStrength * getRandomRange(0.9, 1.1);
+      this.stretch = 0.15; // Stretch when jumping
+    }
+
+    // Jump physics with better arc
+    if (this.isJumping) {
+      this.jumpVelocity += this.gravity;
+      this.jumpHeight -= this.jumpVelocity;
+      
+      // Stretch at peak of jump
+      if (Math.abs(this.jumpVelocity) < 0.5) {
+        this.stretch = 0.1;
+      }
+      
+      if (this.jumpHeight <= 0) {
+        this.jumpHeight = 0;
+        this.isJumping = false;
+        this.squash = 0.3; // Squash on landing
+        this.stretch = 0;
+      }
+    }
+
+    // Smooth squash and stretch
+    this.squash *= 0.85;
+    this.stretch *= 0.85;
+
+    // Walking animation - tilt and bob
+    if (this.isWalking && !this.isBeingCaptured && this.currentSpeed > 0.1) {
+      this.tilt = Math.sin(this.walkTimer * 0.25) * 0.08;
+      this.walkTimer += this.currentSpeed / this.speed; // Speed affects animation
+    } else {
+      this.tilt *= 0.9;
+      this.walkTimer += 0.1;
+    }
   }
 
   draw(ctx, cameraX = 0) {
