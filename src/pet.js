@@ -96,7 +96,10 @@ class Pet {
     this.targetDirection = this.direction;
     this.speedBase = speedBase;
     this.speed = speedBase * getRandomRange(0.8, 1.2);
+    this.currentSpeed = 0;
     this.maxSpeed = this.speed * 1.5;
+    this.acceleration = 0.08;
+    this.deceleration = 0.12;
 
     this.isWalking = true;
     this.idleTimer = 0;
@@ -105,14 +108,16 @@ class Pet {
 
     this.jumpVelocity = 0;
     this.jumpHeight = 0;
-    this.gravity = 0.4;
-    this.jumpStrength = 3;
+    this.gravity = 0.5;
+    this.jumpStrength = 4.5;
     this.isJumping = false;
 
     this.width = 80;
     this.height = 80;
     this.squash = 0;
+    this.stretch = 0;
     this.tilt = 0;
+    this.turnProgress = 0;
     this.sprite = spriteImg;
     this.stats = stats;
     this.persistent = false;
