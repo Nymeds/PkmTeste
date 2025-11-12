@@ -29,7 +29,16 @@ canvas {
   bottom: 20;
   left: 0;
   background: transparent;
-  image-rendering: pixelated; /* Para sprites pixelados ficarem nítidos */
+  image-rendering: auto; /* Mudado de pixelated para auto para melhor renderização */
+}
+
+/* Estilo para GIFs animados */
+img[data-pet-id] {
+  position: absolute;
+  pointer-events: none;
+  image-rendering: auto;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* Garantir que elementos flutuantes não sejam cortados */
