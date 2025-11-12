@@ -580,6 +580,10 @@ class PetManager {
     setTimeout(() => {
       const index = this.pets.indexOf(pet);
       if (index > -1) {
+        // Clean up GIF element if exists
+        if (pet.gifElement) {
+          pet.destroyGifElement();
+        }
         this.pets.splice(index, 1);
       }
       this.capturingPet = null;
