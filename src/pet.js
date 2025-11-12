@@ -348,28 +348,47 @@ class Pet {
     const baseY = canvas.height - this.height / 2 - POKEMON_GROUND_OFFSET;
     const totalY = baseY - this.jumpHeight - bob;
 
-    ctx.save();
-    ctx.translate(screenX + this.width / 2, totalY);
-    
-    // Apply rotation for tilt and turning
-    const turnTilt = this.turnProgress * 0.15 * Math.sign(this.targetDirection - this.direction);
-    ctx.rotate(this.tilt + turnTilt);
-    
-    // Apply squash and stretch
-    const scaleX = (this.direction >= 0 ? -1 : 1) * (1 + this.stretch * 0.5);
-    const scaleY = (1 - this.squash) * (1 + this.stretch);
-    ctx.scale(scaleX, scaleY);
-
-    // Draw the sprite (supports GIFs and static images)
-    if (img && img.complete && img.naturalWidth > 0) {
-      ctx.drawImage(img, -this.width / 2, -this.height / 2, this.width, this.height);
+    // For GIF sprites, update the HTML element position
+    if (this.isGif && this.gifElement) {
+      const canvasRect = canvas.getBoundingClientRect();
+      
+      // Calculate transformations
+      const turnTilt = this.turnProgress * 0.15 * Math.sign(this.targetDirection - this.direction);
+      const rotation = (this.tilt + turnTilt) * (180 / Math.PI); // Convert to degrees
+      
+      const scaleX = (this.direction >= 0 ? -1 : 1) * (1 + this.stretch * 0.5);
+      const scaleY = (1 - this.squash) * (1 + this.stretch);
+      
+      // Position the GIF element
+      this.gifElement.style.left = (canvasRect.left + screenX) + 'px';
+      this.gifElement.style.top = (canvasRect.top + totalY - this.height / 2) + 'px';
+      this.gifElement.style.transform = `rotate(${rotation}deg) scale(${scaleX}, ${scaleY})`;
+      this.gifElement.style.display = 'block';
     } else {
-      // Fallback color if image not loaded
-      ctx.fillStyle = '#F08030';
-      ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
-    }
+      // For static images (PNG, JPG), draw on canvas as before
+      ctx.save();
+      ctx.translate(screenX + this.width / 2, totalY);
+      
+      // Apply rotation for tilt and turning
+      const turnTilt = this.turnProgress * 0.15 * Math.sign(this.targetDirection - this.direction);
+      ctx.rotate(this.tilt + turnTilt);
+      
+      // Apply squash and stretch
+      const scaleX = (this.direction >= 0 ? -1 : 1) * (1 + this.stretch * 0.5);
+      const scaleY = (1 - this.squash) * (1 + this.stretch);
+      ctx.scale(scaleX, scaleY);
 
-    ctx.restore();
+      // Draw the sprite
+      if (img && img.complete && img.naturalWidth > 0) {
+        ctx.drawImage(img, -this.width / 2, -this.height / 2, this.width, this.height);
+      } else {
+        // Fallback color if image not loaded
+        ctx.fillStyle = '#F08030';
+        ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
+      }
+
+      ctx.restore();
+    }
 
     // Barra de captura
     if (this.isBeingCaptured && this.captureProgress > 0) {
