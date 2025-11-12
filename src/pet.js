@@ -40,16 +40,25 @@ function loadPokedex(dir = POKEDEX_DIR) {
       }
       
       let imagePath = null;
-      const tryNames = [`${name}.png`,`${name}.jpg`,`${name}.jpeg`,`${name}.webp`,'sprite.png','icon.png'];
+      // Prioritize GIF files first for animated sprites, then fall back to static images
+      const tryNames = [`${name}.gif`, `${name}.png`, `${name}.jpg`, `${name}.jpeg`, `${name}.webp`, 'sprite.gif', 'sprite.png', 'icon.png'];
       for (const f of tryNames) {
         const p = path.join(pokemonDir, f);
         if (fs.existsSync(p)) { imagePath = p; break; }
       }
       if (!imagePath) {
         const files = fs.readdirSync(pokemonDir);
+        // Search for GIF files first
         for (const f of files) {
           const lower = f.toLowerCase();
-          if (/\.(png|jpg|jpeg|webp)$/i.test(lower)) { imagePath = path.join(pokemonDir, f); break; }
+          if (/\.gif$/i.test(lower)) { imagePath = path.join(pokemonDir, f); break; }
+        }
+        // Then fall back to other image formats
+        if (!imagePath) {
+          for (const f of files) {
+            const lower = f.toLowerCase();
+            if (/\.(png|jpg|jpeg|webp)$/i.test(lower)) { imagePath = path.join(pokemonDir, f); break; }
+          }
         }
       }
       result.push({
