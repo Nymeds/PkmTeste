@@ -311,18 +311,31 @@ class Pet {
   draw(ctx, cameraX = 0) {
     const img = this.sprite;
     const screenX = Math.floor(this.worldX - cameraX);
-    const bob = Math.sin(this.walkTimer * 0.1) * (this.isWalking ? 2 : 0);
+    
+    // Enhanced bob animation based on speed
+    const bobSpeed = this.isWalking && this.currentSpeed > 0.1 ? this.currentSpeed / this.speed : 0;
+    const bob = Math.sin(this.walkTimer * 0.15) * (3 * bobSpeed);
+    
     const baseY = canvas.height - this.height / 2 - POKEMON_GROUND_OFFSET;
     const totalY = baseY - this.jumpHeight - bob;
 
     ctx.save();
     ctx.translate(screenX + this.width / 2, totalY);
-    ctx.rotate(this.tilt);
-    ctx.scale(this.direction >= 0 ? -1 : 1, 1 - this.squash);
+    
+    // Apply rotation for tilt and turning
+    const turnTilt = this.turnProgress * 0.15 * Math.sign(this.targetDirection - this.direction);
+    ctx.rotate(this.tilt + turnTilt);
+    
+    // Apply squash and stretch
+    const scaleX = (this.direction >= 0 ? -1 : 1) * (1 + this.stretch * 0.5);
+    const scaleY = (1 - this.squash) * (1 + this.stretch);
+    ctx.scale(scaleX, scaleY);
 
+    // Draw the sprite (supports GIFs and static images)
     if (img && img.complete && img.naturalWidth > 0) {
       ctx.drawImage(img, -this.width / 2, -this.height / 2, this.width, this.height);
     } else {
+      // Fallback color if image not loaded
       ctx.fillStyle = '#F08030';
       ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
     }
