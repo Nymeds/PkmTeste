@@ -20,7 +20,10 @@ let POKEMON_GROUND_OFFSET = 40; // Acima da barra de tarefas
 
 const DEFAULT_SPRITE = path.join(__dirname, '..', 'pet.png');
 const POKEDEX_DIR = path.join(__dirname, '..', 'pokedex');
-const WORLD_WIDTH = canvas.width;
+
+function getWorldWidth() {
+  return canvas.width;
+}
 
 function getRandomRange(min, max) { return Math.random() * (max - min) + min; }
 
