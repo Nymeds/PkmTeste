@@ -438,8 +438,9 @@ class Pet {
 
   isMouseOver(mouseX, mouseY, cameraX = 0) {
     const screenX = this.worldX - cameraX;
-    const bob = Math.sin(this.walkTimer * 0.1) * (this.isWalking ? 2 : 0);
-    const baseY = canvas.height - this.height / 2;
+    const bobSpeed = this.isWalking && this.currentSpeed > 0.1 ? this.currentSpeed / this.speed : 0;
+    const bob = Math.sin(this.walkTimer * 0.15) * (3 * bobSpeed);
+    const baseY = canvas.height - this.height / 2 - POKEMON_GROUND_OFFSET;
     const totalY = baseY - this.jumpHeight - bob;
 
     const left = screenX;
