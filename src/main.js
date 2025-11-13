@@ -199,6 +199,19 @@ ipcMain.on('hide-card', (event) => {
   }
 });
 
+// Handler para controlar click-through dinamicamente
+ipcMain.on('set-ignore-mouse-events', (event, ignore) => {
+  if (win && !win.isDestroyed()) {
+    if (ignore) {
+      // Permitir click-through (cliques passam para outros programas)
+      win.setIgnoreMouseEvents(true, { forward: true });
+    } else {
+      // Capturar cliques (quando mouse está sobre Pokémon)
+      win.setIgnoreMouseEvents(false);
+    }
+  }
+});
+
 // Handler para salvar XP no banco de dados
 ipcMain.on('save-xp', async (event, xpData) => {
   try {
