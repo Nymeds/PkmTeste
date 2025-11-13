@@ -360,8 +360,6 @@ class Pet {
 
     // For GIF sprites, update the HTML element position
     if (this.isGif && this.gifElement) {
-      const canvasRect = canvas.getBoundingClientRect();
-      
       // Calculate transformations
       const turnTilt = this.turnProgress * 0.15 * Math.sign(this.targetDirection - this.direction);
       const rotation = (this.tilt + turnTilt) * (180 / Math.PI); // Convert to degrees
@@ -369,9 +367,9 @@ class Pet {
       const scaleX = (this.direction >= 0 ? -1 : 1) * (1 + this.stretch * 0.5);
       const scaleY = (1 - this.squash) * (1 + this.stretch);
       
-      // Position the GIF element
-      this.gifElement.style.left = (canvasRect.left + screenX) + 'px';
-      this.gifElement.style.top = (canvasRect.top + totalY - this.height / 2) + 'px';
+      // Position the GIF element usando coordenadas fixas na tela
+      this.gifElement.style.left = screenX + 'px';
+      this.gifElement.style.top = (totalY - this.height / 2) + 'px';
       this.gifElement.style.transform = `rotate(${rotation}deg) scale(${scaleX}, ${scaleY})`;
       this.gifElement.style.display = 'block';
     } else {
