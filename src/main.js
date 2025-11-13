@@ -91,13 +91,12 @@ function createCardWindow() {
 
 function createWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-  const windowWidth = 480, windowHeight = 120;
 
   win = new BrowserWindow({
-    width: windowWidth,
-    height: windowHeight,
-    x: Math.floor(Math.random() * Math.max(1, width - windowWidth)),
-    y: height - (windowHeight + 20),
+    width: width,
+    height: height,
+    x: 0,
+    y: 0,
     transparent: true,
     frame: false,
     alwaysOnTop: true,
@@ -112,7 +111,8 @@ function createWindow() {
   });
 
   win.loadFile(path.join(__dirname, 'index.html'));
-  win.setIgnoreMouseEvents(false);
+  // Inicialmente permite click-through, mas será ajustado dinamicamente
+  win.setIgnoreMouseEvents(true, { forward: true });
   win.setMenu(null);
 
   createCardWindow();
