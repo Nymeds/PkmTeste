@@ -16,20 +16,25 @@
 html, body { 
   margin: 0; 
   padding: 0;
-  overflow: visible !important; 
+  overflow: hidden; 
   background: transparent;
-  width: 100%;
-  height: 100%;
-  position: relative;
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
 }
 
-/* Ajuste do canvas para comportar múltiplos pets */
+/* Canvas em tela cheia */
 canvas {
-  position: absolute;
-  bottom: 20;
+  position: fixed;
+  top: 0;
   left: 0;
+  width: 100%;
+  height: 100%;
   background: transparent;
-  image-rendering: auto; /* Mudado de pixelated para auto para melhor renderização */
+  image-rendering: auto;
+  pointer-events: none; /* Canvas não captura cliques */
 }
 
 /* Estilo para GIFs animados */
