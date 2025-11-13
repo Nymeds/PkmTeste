@@ -738,7 +738,7 @@ class PetManager {
     const pet = new Pet({
       id: opts.id ?? entry.id,
       uuid: opts.uuid ?? opts.id,
-      x: opts.x ?? getRandomRange(0, Math.max(0, WORLD_WIDTH - 80)),
+      x: opts.x ?? getRandomRange(0, Math.max(0, getWorldWidth() - 80)),
       speedBase: opts.speedBase ?? 1.2,
       spriteImg,
       stats: entry.stats,
