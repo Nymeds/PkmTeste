@@ -39,11 +39,13 @@ canvas {
 
 /* Estilo para GIFs animados */
 img[data-pet-id] {
-  position: absolute;
-  pointer-events: none;
+  position: fixed;
+  pointer-events: auto; /* GIFs podem receber cliques */
   image-rendering: auto;
   user-select: none;
   -webkit-user-select: none;
+  cursor: pointer;
+  z-index: 10000;
 }
 
 /* Garantir que elementos flutuantes não sejam cortados */
