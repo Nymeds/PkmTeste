@@ -6,8 +6,17 @@ const { pathToFileURL } = require('url');
 
 const canvas = document.getElementById('petCanvas');
 const ctx = canvas.getContext('2d');
-// Altura do chão dos Pokémon — quanto maior, mais para cima eles ficam
-let POKEMON_GROUND_OFFSET = -10; // pixels (0 = encostado no fundo)
+
+// Ajustar canvas para tela cheia
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Altura do chão dos Pokémon (pixels acima da parte inferior da tela)
+let POKEMON_GROUND_OFFSET = 40; // Acima da barra de tarefas
 
 const DEFAULT_SPRITE = path.join(__dirname, '..', 'pet.png');
 const POKEDEX_DIR = path.join(__dirname, '..', 'pokedex');
