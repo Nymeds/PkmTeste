@@ -810,7 +810,7 @@ class PetManager {
   }
 
   spawnRandom(count = 1) {
-    for (let i = 0; i < count; i++) this.addPet({ id: `pet-${Date.now()}-${i}`, x: getRandomRange(0, WORLD_WIDTH - 80), speedBase: getRandomRange(0.6, 1.6) });
+    for (let i = 0; i < count; i++) this.addPet({ id: `pet-${Date.now()}-${i}`, x: getRandomRange(0, getWorldWidth() - 80), speedBase: getRandomRange(0.6, 1.6) });
   }
 
   update() {
