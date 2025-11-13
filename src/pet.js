@@ -773,7 +773,7 @@ class PetManager {
     const shuffled = [...this.pokedex].sort(() => Math.random() - 0.5);
     const selected = shuffled.slice(0, availableSlots);
     for (const entry of selected) {
-      this.addPetFromPokedex(entry.id, { id: entry.id, x: getRandomRange(0, Math.max(0, WORLD_WIDTH - 80)) });
+      this.addPetFromPokedex(entry.id, { id: entry.id, x: getRandomRange(0, Math.max(0, getWorldWidth() - 80)) });
     }
   }
 
