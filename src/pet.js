@@ -121,8 +121,8 @@ class Pet {
     this.jumpStrength = 4.5;
     this.isJumping = false;
 
-    this.width = 64;
-    this.height = 64;
+    this.width = 48;
+    this.height = 48;
     this.squash = 0;
     this.stretch = 0;
     this.tilt = 0;
