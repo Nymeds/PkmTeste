@@ -16,7 +16,7 @@ resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
 
 // Altura do chão dos Pokémon (pixels acima da parte inferior da tela)
-let POKEMON_GROUND_OFFSET = 40; // Acima da barra de tarefas
+let POKEMON_GROUND_OFFSET = 6; // Acima da barra de tarefas
 
 const DEFAULT_SPRITE = path.join(__dirname, '..', 'pet.png');
 const POKEDEX_DIR = path.join(__dirname, '..', 'pokedex');
@@ -38,19 +38,19 @@ function loadPokedex(dir = POKEDEX_DIR) {
       const pokemonDir = path.join(dir, name);
       const statsPath = path.join(pokemonDir, 'stats.json');
       const dataPath = path.join(pokemonDir, 'data.json');
-      
+
       let stats = null;
       if (fs.existsSync(statsPath)) {
         try { stats = JSON.parse(fs.readFileSync(statsPath, 'utf8')); }
         catch (e) { console.error('Error parsing stats:', statsPath, e); }
       }
-      
+
       let data = null;
       if (fs.existsSync(dataPath)) {
         try { data = JSON.parse(fs.readFileSync(dataPath, 'utf8')); }
         catch (e) { console.error('Error parsing data:', dataPath, e); }
       }
-      
+
       let imagePath = null;
       // Prioritize GIF files first for animated sprites, then fall back to static images
       const tryNames = [`${name}.gif`, `${name}.png`, `${name}.jpg`, `${name}.jpeg`, `${name}.webp`, 'sprite.gif', 'sprite.png', 'icon.png'];
@@ -138,7 +138,7 @@ class Pet {
     // GIF handling
     this.isGif = isGif;
     this.gifElement = null;
-    
+
     if (this.isGif && spriteImg) {
       this.createGifElement();
     }
@@ -187,7 +187,7 @@ class Pet {
 
   gainXP(amount) {
     this.xp += amount;
-    
+
     while (this.xp >= this.xpToNextLevel) {
       this.levelUp();
     }
@@ -197,9 +197,9 @@ class Pet {
     this.xp -= this.xpToNextLevel;
     this.level++;
     this.xpToNextLevel = this.calculateXPToNextLevel();
-    
+
     console.log(`${this.id} subiu para o nível ${this.level}!`);
-    
+
     if (this.stats && this.stats.baseStats) {
       const growth = {
         hp: this.stats.hpGrowth || 5,
@@ -230,24 +230,24 @@ class Pet {
 
   updateCapture(deltaTime) {
     if (!this.isBeingCaptured) return;
-    
+
     const captureSpeed = 0.25; // Progresso por segundo
     this.captureProgress += captureSpeed * (deltaTime / 1000);
-    
+
     // Simular "tremidas" da pokébola
     const shakeInterval = 0.33; // A cada 33% de progresso
     const currentShake = Math.floor(this.captureProgress / shakeInterval);
-    
+
     if (currentShake > this.captureShakes && currentShake < 3) {
       this.captureShakes = currentShake;
       console.log(`Tremida ${this.captureShakes}/3...`);
     }
-    
+
     if (this.captureProgress >= 1 && !this.captureSucceeded && !this.captureFailed) {
       // Momento de decidir se capturou ou não
       const captureRate = getCaptureRate(this.rarity);
       const success = Math.random() < captureRate;
-      
+
       if (success) {
         this.captureSucceeded = true;
         console.log(`${this.id} capturado! (Chance: ${(captureRate * 100).toFixed(0)}%)`);
@@ -293,15 +293,15 @@ class Pet {
     if (this.isWalking && !this.isBeingCaptured) {
       this.currentSpeed += (this.speed - this.currentSpeed) * this.acceleration;
       this.worldX += this.currentSpeed * this.direction;
-      
+
       const max = getWorldWidth() - this.width;
-      if (this.worldX < 0) { 
-        this.worldX = 0; 
+      if (this.worldX < 0) {
+        this.worldX = 0;
         this.targetDirection = 1;
         this.currentSpeed *= 0.5; // Bounce effect
       }
-      if (this.worldX > max) { 
-        this.worldX = max; 
+      if (this.worldX > max) {
+        this.worldX = max;
         this.targetDirection = -1;
         this.currentSpeed *= 0.5; // Bounce effect
       }
@@ -322,12 +322,12 @@ class Pet {
     if (this.isJumping) {
       this.jumpVelocity += this.gravity;
       this.jumpHeight -= this.jumpVelocity;
-      
+
       // Stretch at peak of jump
       if (Math.abs(this.jumpVelocity) < 0.5) {
         this.stretch = 0.1;
       }
-      
+
       if (this.jumpHeight <= 0) {
         this.jumpHeight = 0;
         this.isJumping = false;
@@ -353,11 +353,11 @@ class Pet {
   draw(ctx, cameraX = 0) {
     const img = this.sprite;
     const screenX = Math.floor(this.worldX - cameraX);
-    
+
     // Enhanced bob animation based on speed
     const bobSpeed = this.isWalking && this.currentSpeed > 0.1 ? this.currentSpeed / this.speed : 0;
     const bob = Math.sin(this.walkTimer * 0.15) * (3 * bobSpeed);
-    
+
     const baseY = canvas.height - this.height / 2 - POKEMON_GROUND_OFFSET;
     const totalY = baseY - this.jumpHeight - bob;
 
@@ -366,10 +366,10 @@ class Pet {
       // Calculate transformations
       const turnTilt = this.turnProgress * 0.15 * Math.sign(this.targetDirection - this.direction);
       const rotation = (this.tilt + turnTilt) * (180 / Math.PI); // Convert to degrees
-      
+
       const scaleX = (this.direction >= 0 ? -1 : 1) * (1 + this.stretch * 0.5);
       const scaleY = (1 - this.squash) * (1 + this.stretch);
-      
+
       // Position the GIF element usando coordenadas fixas na tela
       this.gifElement.style.left = screenX + 'px';
       this.gifElement.style.top = (totalY - this.height / 2) + 'px';
@@ -379,11 +379,11 @@ class Pet {
       // For static images (PNG, JPG), draw on canvas as before
       ctx.save();
       ctx.translate(screenX + this.width / 2, totalY);
-      
+
       // Apply rotation for tilt and turning
       const turnTilt = this.turnProgress * 0.15 * Math.sign(this.targetDirection - this.direction);
       ctx.rotate(this.tilt + turnTilt);
-      
+
       // Apply squash and stretch
       const scaleX = (this.direction >= 0 ? -1 : 1) * (1 + this.stretch * 0.5);
       const scaleY = (1 - this.squash) * (1 + this.stretch);
@@ -407,31 +407,31 @@ class Pet {
       const barHeight = 6;
       const barX = screenX;
       const barY = totalY - this.height / 2 - 15;
-      
+
       // Fundo da barra
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
       ctx.fillRect(barX, barY, barWidth, barHeight);
-      
+
       // Cor baseada no status
       let barColor = '#FF9800'; // Laranja (capturando)
       if (this.captureSucceeded) barColor = '#4CAF50'; // Verde (sucesso)
       if (this.captureFailed) barColor = '#f44336'; // Vermelho (falha)
-      
+
       // Progresso da captura
       ctx.fillStyle = barColor;
       ctx.fillRect(barX, barY, barWidth * Math.min(1, this.captureProgress), barHeight);
-      
+
       // Texto de status
       ctx.fillStyle = '#fff';
       ctx.font = 'bold 10px Arial';
       ctx.strokeStyle = '#000';
       ctx.lineWidth = 3;
-      
+
       let text = 'Capturando...';
       if (this.captureShakes > 0) text = `Tremendo... ${this.captureShakes}/3`;
       if (this.captureSucceeded) text = 'Capturado!';
       if (this.captureFailed) text = 'Escapou!';
-      
+
       const textWidth = ctx.measureText(text).width;
       ctx.strokeText(text, barX + (barWidth - textWidth) / 2, barY - 4);
       ctx.fillText(text, barX + (barWidth - textWidth) / 2, barY - 4);
@@ -460,7 +460,7 @@ class Pet {
     const baseY = canvas.height - this.height / 2 - POKEMON_GROUND_OFFSET;
     const totalY = baseY - this.jumpHeight - bob;
     const topY = totalY - this.height / 2;
-    
+
     return { x: screenX, y: topY };
   }
 
@@ -550,12 +550,12 @@ class PetManager {
 
   startCapture(pet) {
     if (this.capturingPet) return; // Já está capturando outro
-    
+
     if (pet.startCapture()) {
       this.capturingPet = pet;
       const captureRate = getCaptureRate(pet.rarity);
       console.log(`Iniciando captura de ${pet.id} (${pet.rarity}) - Chance: ${(captureRate * 100).toFixed(0)}%`);
-      
+
       // Verificar progresso da captura
       const checkCapture = setInterval(() => {
         if (!this.capturingPet || this.capturingPet !== pet) {
@@ -570,7 +570,7 @@ class PetManager {
             this.completeCapture(pet);
           }, 800);
         }
-        
+
         // Captura falhou
         if (pet.captureFailed) {
           clearInterval(checkCapture);
@@ -584,11 +584,11 @@ class PetManager {
 
   completeCapture(pet) {
     console.log(`${pet.id} capturado com sucesso!`);
-    
+
     // Enviar dados para salvar no banco
     const captureData = pet.getCaptureData();
     ipcRenderer.send('capture-pokemon', captureData);
-    
+
     // Remover o Pokémon selvagem
     setTimeout(() => {
       const index = this.pets.indexOf(pet);
@@ -605,7 +605,7 @@ class PetManager {
 
   failCapture(pet) {
     console.log(`${pet.id} escapou!`);
-    
+
     // Resetar o Pokémon para tentar novamente
     setTimeout(() => {
       pet.cancelCapture();
@@ -669,7 +669,7 @@ class PetManager {
 
   showInfoCard(pet) {
     const petPos = pet.getScreenPosition(this.cameraX);
-    
+
     const statsWithXP = {
       ...(pet.stats || {}),
       level: pet.level,
@@ -677,7 +677,7 @@ class PetManager {
       xpToNextLevel: pet.xpToNextLevel,
       rarity: pet.rarity
     };
-    
+
     ipcRenderer.send('show-card', {
       stats: statsWithXP,
       x: Math.round(petPos.x),
@@ -689,7 +689,7 @@ class PetManager {
 
   updateInfoCardPosition(pet) {
     const petPos = pet.getScreenPosition(this.cameraX);
-    
+
     const statsWithXP = {
       ...(pet.stats || {}),
       level: pet.level,
@@ -697,7 +697,7 @@ class PetManager {
       xpToNextLevel: pet.xpToNextLevel,
       rarity: pet.rarity
     };
-    
+
     ipcRenderer.send('show-card', {
       stats: statsWithXP,
       x: Math.round(petPos.x),
@@ -731,10 +731,10 @@ class PetManager {
     const entry = this.pokedex.find(p => p.id.toLowerCase() === String(name).toLowerCase());
     if (!entry) return null;
     const spriteImg = entry.imgObj || this.defaultImage;
-    
+
     // Check if the sprite is a GIF
     const isGif = entry.imagePath && entry.imagePath.toLowerCase().endsWith('.gif');
-    
+
     const pet = new Pet({
       id: opts.id ?? entry.id,
       uuid: opts.uuid ?? opts.id,
@@ -756,14 +756,14 @@ class PetManager {
   respawnRandomFromPokedex(count = 2) {
     const persistent = this.pets.filter(p => p.persistent);
     const removed = this.pets.filter(p => !p.persistent);
-    
+
     // Clean up GIF elements for removed pets
     removed.forEach(pet => {
       if (pet.gifElement) {
         pet.destroyGifElement();
       }
     });
-    
+
     this.pets = [...persistent];
     if (this.pokedex.length === 0) {
       this.spawnRandom(count);
@@ -780,7 +780,7 @@ class PetManager {
   addPet(config = {}) {
     let spriteImg = this.defaultImage;
     let isGif = false;
-    
+
     if (config.sprite) {
       try {
         spriteImg = new Image();
@@ -793,7 +793,7 @@ class PetManager {
         }
       } catch (e) { spriteImg = this.defaultImage; }
     }
-    
+
     const pet = new Pet({
       id: config.id,
       uuid: config.uuid,
@@ -825,14 +825,14 @@ class PetManager {
       }
     });
   }
-  
+
   draw() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.pets.forEach(p => p.draw(this.ctx, this.cameraX));
   }
-  
+
   loop = () => { this.update(); this.draw(); requestAnimationFrame(this.loop); }
-  
+
   start() { if (!this._started) { this._started = true; requestAnimationFrame(this.loop); } }
 }
 
@@ -852,10 +852,10 @@ function startAutoRespawn() {
 
 ipcRenderer.on('persisted-pokemons', (evt, list) => {
   for (const p of list) {
-    manager.addPetFromPokedex(p.id, { 
-      id: p.uuid ?? p.id, 
+    manager.addPetFromPokedex(p.id, {
+      id: p.uuid ?? p.id,
       uuid: p.uuid,
-      x: 20, 
+      x: 20,
       persistent: true,
       level: p.level ?? 1,
       xp: p.xp ?? 0
@@ -866,10 +866,10 @@ ipcRenderer.on('persisted-pokemons', (evt, list) => {
 
 ipcRenderer.on('starter-selected', (evt, payload) => {
   if (payload && payload.species) {
-    manager.addPetFromPokedex(payload.species, { 
+    manager.addPetFromPokedex(payload.species, {
       id: payload.uuid ?? payload.species,
       uuid: payload.uuid,
-      x: 20, 
+      x: 20,
       persistent: true,
       level: 1,
       xp: 0
