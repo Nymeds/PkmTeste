@@ -523,10 +523,9 @@ class PetManager {
   }
 
   setupClickHandler() {
-    this.canvas.addEventListener('click', (e) => {
-      const rect = this.canvas.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
+    document.addEventListener('click', (e) => {
+      const mouseX = e.clientX;
+      const mouseY = e.clientY;
 
       // Verificar se clicou em algum Pokémon selvagem
       for (const pet of this.pets) {
