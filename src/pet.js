@@ -158,13 +158,14 @@ class Pet {
   createGifElement() {
     this.gifElement = document.createElement('img');
     this.gifElement.src = this.sprite.src;
-    this.gifElement.style.position = 'absolute';
+    this.gifElement.style.position = 'fixed';
     this.gifElement.style.width = this.width + 'px';
     this.gifElement.style.height = this.height + 'px';
-    this.gifElement.style.pointerEvents = 'none';
+    this.gifElement.style.pointerEvents = 'auto';
     this.gifElement.style.imageRendering = 'auto';
     this.gifElement.style.transformOrigin = 'center center';
-    this.gifElement.style.zIndex = '1000';
+    this.gifElement.style.zIndex = '10000';
+    this.gifElement.style.cursor = this.persistent ? 'default' : 'pointer';
     this.gifElement.dataset.petId = this.uuid;
     document.body.appendChild(this.gifElement);
   }
