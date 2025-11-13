@@ -294,7 +294,7 @@ class Pet {
       this.currentSpeed += (this.speed - this.currentSpeed) * this.acceleration;
       this.worldX += this.currentSpeed * this.direction;
       
-      const max = WORLD_WIDTH - this.width;
+      const max = getWorldWidth() - this.width;
       if (this.worldX < 0) { 
         this.worldX = 0; 
         this.targetDirection = 1;
