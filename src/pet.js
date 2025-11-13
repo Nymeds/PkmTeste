@@ -493,6 +493,7 @@ class PetManager {
     this.hoveredPet = null;
     this.capturingPet = null;
     this.lastFrameTime = Date.now();
+    this.mouseOverPet = false;
     this.loadPokedex(options.pokedexDir || POKEDEX_DIR);
     this.setupMouseTracking();
     this.setupClickHandler();
