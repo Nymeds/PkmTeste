@@ -619,10 +619,10 @@ class PetManager {
   }
 
   setupMouseTracking() {
-    this.canvas.addEventListener('mousemove', (e) => {
-      const rect = this.canvas.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
+    // Usar mousemove global para detectar quando o mouse está sobre um Pokémon
+    document.addEventListener('mousemove', (e) => {
+      const mouseX = e.clientX;
+      const mouseY = e.clientY;
 
       let foundPet = null;
       for (const pet of this.pets) {
@@ -632,28 +632,35 @@ class PetManager {
         }
       }
 
+      // Atualizar estado do mouse
+      const wasOverPet = this.mouseOverPet;
+      this.mouseOverPet = !!foundPet;
+
+      // Notificar main process para ajustar click-through
+      if (wasOverPet !== this.mouseOverPet) {
+        ipcRenderer.send('set-ignore-mouse-events', !this.mouseOverPet);
+      }
+
       if (foundPet !== this.hoveredPet) {
         this.hoveredPet = foundPet;
         if (foundPet) {
           this.showInfoCard(foundPet);
-          if (!foundPet.persistent && !foundPet.isBeingCaptured) {
-            this.canvas.style.cursor = 'pointer';
-          } else {
-            this.canvas.style.cursor = 'default';
-          }
+          document.body.style.cursor = (!foundPet.persistent && !foundPet.isBeingCaptured) ? 'pointer' : 'default';
         } else {
           this.hideInfoCard();
-          this.canvas.style.cursor = 'default';
+          document.body.style.cursor = 'default';
         }
       } else if (foundPet) {
         this.updateInfoCardPosition(foundPet);
       }
     });
 
-    this.canvas.addEventListener('mouseleave', () => {
+    document.addEventListener('mouseleave', () => {
       this.hoveredPet = null;
       this.hideInfoCard();
-      this.canvas.style.cursor = 'default';
+      this.mouseOverPet = false;
+      document.body.style.cursor = 'default';
+      ipcRenderer.send('set-ignore-mouse-events', true);
     });
   }
 
