@@ -1,0 +1,15 @@
+{
+  "name": "Venusaur",
+  "type": ["Grass", "Poison"],
+  "baseStats": {
+    "hp": 80,
+    "attack": 82,
+    "defense": 83,
+    "speed": 80
+  },
+  "hpGrowth": 8,
+  "attackGrowth": 5,
+  "defenseGrowth": 5,
+  "speedGrowth": 4,
+  "xpPerLevel": 150
+}

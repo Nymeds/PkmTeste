@@ -10,5 +10,7 @@
   "growthRate": "medium",
   "type": ["grass", "poison"],
   "description": "A semente nas costas cresce absorvendo nutrientes do corpo.",
-  "rarity": "starter"
+  "rarity": "starter",
+  "evolvesTo": "ivysaur",
+  "evolutionLevel": 16
 }

@@ -212,6 +212,32 @@ ipcMain.on('set-ignore-mouse-events', (event, ignore) => {
   }
 });
 
+// Handler para evolução de Pokémon
+ipcMain.on('pokemon-evolved', async (event, evolutionData) => {
+  try {
+    const { uuid, oldSpecies, newSpecies, level, xp, stats, imagePath } = evolutionData;
+    
+    console.log(`🔄 Salvando evolução: ${oldSpecies} → ${newSpecies} (UUID: ${uuid})`);
+    
+    // Atualizar Pokémon no banco de dados
+    await prisma.capturedPokemon.update({
+      where: { uuid: uuid },
+      data: {
+        species: newSpecies,
+        stats: JSON.stringify(stats || {}),
+        imagePath: imagePath || null,
+        level: level,
+        xp: xp
+      }
+    });
+    
+    console.log(`✅ Evolução salva: ${oldSpecies} → ${newSpecies}!`);
+    
+  } catch (error) {
+    console.error('❌ Erro ao salvar evolução:', error);
+  }
+});
+
 // Handler para salvar XP no banco de dados
 ipcMain.on('save-xp', async (event, xpData) => {
   try {

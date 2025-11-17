@@ -1,0 +1,16 @@
+{
+  "id": "charizard",
+  "name": "Charizard",
+  "baseStats": {
+    "hp": 78,
+    "attack": 84,
+    "defense": 78,
+    "speed": 100
+  },
+  "growthRate": "medium",
+  "type": ["fire", "flying"],
+  "description": "Voa pelo céu procurando oponentes poderosos. Ele cospe fogo que é tão quente que derrete pedras.",
+  "rarity": "rare",
+  "evolvesTo": null,
+  "evolutionLevel": null
+}

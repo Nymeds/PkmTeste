@@ -1,0 +1,16 @@
+{
+  "id": "venusaur",
+  "name": "Venusaur",
+  "baseStats": {
+    "hp": 80,
+    "attack": 82,
+    "defense": 83,
+    "speed": 80
+  },
+  "growthRate": "medium",
+  "type": ["grass", "poison"],
+  "description": "A flor em suas costas capta os raios solares. Acredita-se que as cores vivas da flor sejam o resultado de bons nutrientes e luz solar.",
+  "rarity": "rare",
+  "evolvesTo": null,
+  "evolutionLevel": null
+}

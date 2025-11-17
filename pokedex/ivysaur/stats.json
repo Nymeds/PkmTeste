@@ -1,0 +1,15 @@
+{
+  "name": "Ivysaur",
+  "type": ["Grass", "Poison"],
+  "baseStats": {
+    "hp": 60,
+    "attack": 62,
+    "defense": 63,
+    "speed": 60
+  },
+  "hpGrowth": 6,
+  "attackGrowth": 4,
+  "defenseGrowth": 4,
+  "speedGrowth": 3,
+  "xpPerLevel": 120
+}

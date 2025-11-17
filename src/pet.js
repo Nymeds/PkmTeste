@@ -100,7 +100,7 @@ function getCaptureRate(rarity) {
 }
 
 class Pet {
-  constructor({ id, uuid, x = 0, speedBase = 1.2, spriteImg = null, stats = null, level = 1, xp = 0, rarity = 'common', isGif = false }) {
+  constructor({ id, uuid, x = 0, speedBase = 1.2, spriteImg = null, stats = null, level = 1, xp = 0, rarity = 'common', isGif = false, data = null, manager = null }) {
     this.id = id ?? `pet-${Math.floor(Math.random() * 99999)}`;
     this.uuid = uuid ?? this.id;
     this.worldX = x;
@@ -147,6 +147,14 @@ class Pet {
     this.level = level;
     this.xp = xp;
     this.xpToNextLevel = this.calculateXPToNextLevel();
+
+    // Sistema de Evolução
+    this.data = data;
+    this.manager = manager;
+    this.evolvesTo = data?.evolvesTo || null;
+    this.evolutionLevel = data?.evolutionLevel || null;
+    this.isEvolving = false;
+    this.evolutionProgress = 0;
 
     // Sistema de captura
     this.isBeingCaptured = false;
@@ -214,6 +222,48 @@ class Pet {
         }
       }
     }
+
+    // Checar se pode evoluir
+    if (this.persistent && this.evolvesTo && this.evolutionLevel && this.level >= this.evolutionLevel) {
+      console.log(`🌟 ${this.id} está pronto para evoluir para ${this.evolvesTo}!`);
+      this.startEvolution();
+    }
+  }
+
+  startEvolution() {
+    if (this.isEvolving || !this.evolvesTo) return;
+    
+    this.isEvolving = true;
+    this.evolutionProgress = 0;
+    console.log(`✨ Iniciando evolução de ${this.id} para ${this.evolvesTo}...`);
+  }
+
+  updateEvolution(deltaTime) {
+    if (!this.isEvolving) return;
+    
+    const evolutionSpeed = 0.5; // Progresso por segundo
+    this.evolutionProgress += evolutionSpeed * (deltaTime / 1000);
+    
+    if (this.evolutionProgress >= 1) {
+      this.completeEvolution();
+    }
+  }
+
+  completeEvolution() {
+    if (!this.evolvesTo || !this.manager) return;
+    
+    const oldSpecies = this.id;
+    const newSpecies = this.evolvesTo;
+    
+    console.log(`🎉 ${oldSpecies} evoluiu para ${newSpecies}!`);
+    
+    // Notificar o manager para trocar o Pokémon
+    if (this.manager) {
+      this.manager.evolvePokemon(this, newSpecies);
+    }
+    
+    this.isEvolving = false;
+    this.evolutionProgress = 0;
   }
 
   startCapture() {
@@ -267,7 +317,13 @@ class Pet {
     this.captureSucceeded = false;
   }
 
-  update() {
+  update(deltaTime = 16) {
+    // Evolução em progresso
+    if (this.isEvolving) {
+      this.updateEvolution(deltaTime);
+      return; // Não faz outras ações durante evolução
+    }
+
     // Idle/Walk state management
     this.idleTimer++;
     if (this.idleTimer > this.idleDuration) {
@@ -435,6 +491,47 @@ class Pet {
       const textWidth = ctx.measureText(text).width;
       ctx.strokeText(text, barX + (barWidth - textWidth) / 2, barY - 4);
       ctx.fillText(text, barX + (barWidth - textWidth) / 2, barY - 4);
+    }
+
+    // Animação de Evolução
+    if (this.isEvolving) {
+      // Efeito de brilho pulsante
+      const pulseIntensity = Math.sin(this.evolutionProgress * Math.PI * 4) * 0.5 + 0.5;
+      
+      // Círculo de luz ao redor do Pokémon
+      ctx.save();
+      ctx.globalAlpha = pulseIntensity * 0.5;
+      ctx.fillStyle = '#FFD700'; // Dourado
+      ctx.beginPath();
+      ctx.arc(screenX + this.width / 2, totalY, this.width * (0.8 + pulseIntensity * 0.3), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Partículas de luz
+      for (let i = 0; i < 8; i++) {
+        const angle = (Date.now() / 500 + i * Math.PI / 4) % (Math.PI * 2);
+        const radius = this.width * 0.8;
+        const particleX = screenX + this.width / 2 + Math.cos(angle) * radius;
+        const particleY = totalY + Math.sin(angle) * radius;
+        
+        ctx.save();
+        ctx.globalAlpha = pulseIntensity;
+        ctx.fillStyle = '#FFF';
+        ctx.beginPath();
+        ctx.arc(particleX, particleY, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Texto "Evoluindo..."
+      ctx.fillStyle = '#FFD700';
+      ctx.font = 'bold 14px Arial';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 4;
+      const evolText = 'Evoluindo...';
+      const evolTextWidth = ctx.measureText(evolText).width;
+      ctx.strokeText(evolText, screenX + (this.width - evolTextWidth) / 2, totalY - this.height);
+      ctx.fillText(evolText, screenX + (this.width - evolTextWidth) / 2, totalY - this.height);
     }
   }
 
@@ -711,6 +808,58 @@ class PetManager {
     ipcRenderer.send('hide-card');
   }
 
+  evolvePokemon(pet, newSpecies) {
+    console.log(`🔄 Evoluindo ${pet.id} para ${newSpecies}...`);
+    
+    // Buscar dados da evolução na pokedex
+    const evolutionEntry = this.pokedex.find(p => p.id.toLowerCase() === newSpecies.toLowerCase());
+    
+    if (!evolutionEntry) {
+      console.error(`❌ Evolução ${newSpecies} não encontrada na Pokedex!`);
+      return;
+    }
+
+    // Atualizar dados do pet
+    const oldId = pet.id;
+    pet.id = evolutionEntry.id;
+    pet.stats = evolutionEntry.stats;
+    pet.rarity = evolutionEntry.rarity;
+    pet.data = evolutionEntry.data;
+    pet.evolvesTo = evolutionEntry.data?.evolvesTo || null;
+    pet.evolutionLevel = evolutionEntry.data?.evolutionLevel || null;
+
+    // Trocar sprite
+    const oldIsGif = pet.isGif;
+    const newIsGif = evolutionEntry.imagePath && evolutionEntry.imagePath.toLowerCase().endsWith('.gif');
+    
+    // Destruir elemento GIF antigo se existir
+    if (oldIsGif && pet.gifElement) {
+      pet.destroyGifElement();
+    }
+
+    // Atualizar sprite
+    pet.sprite = evolutionEntry.imgObj || this.defaultImage;
+    pet.isGif = newIsGif;
+
+    // Criar novo elemento GIF se necessário
+    if (newIsGif) {
+      pet.createGifElement();
+    }
+
+    // Notificar main process para atualizar banco de dados
+    ipcRenderer.send('pokemon-evolved', {
+      uuid: pet.uuid,
+      oldSpecies: oldId,
+      newSpecies: pet.id,
+      level: pet.level,
+      xp: pet.xp,
+      stats: pet.stats,
+      imagePath: evolutionEntry.imagePath
+    });
+
+    console.log(`✅ ${oldId} evoluiu para ${pet.id}!`);
+  }
+
   loadPokedex(dir) {
     this.pokedex = loadPokedex(dir);
     for (const entry of this.pokedex) {
@@ -745,7 +894,9 @@ class PetManager {
       level: opts.level ?? 1,
       xp: opts.xp ?? 0,
       rarity: entry.rarity,
-      isGif: isGif
+      isGif: isGif,
+      data: entry.data,
+      manager: this
     });
     if (opts.persistent) pet.persistent = true;
     if (typeof opts.direction === 'number') pet.direction = opts.direction;
@@ -819,7 +970,7 @@ class PetManager {
     this.lastFrameTime = currentTime;
 
     this.pets.forEach(p => {
-      p.update();
+      p.update(deltaTime);
       if (p.isBeingCaptured) {
         p.updateCapture(deltaTime);
       }

@@ -1,0 +1,16 @@
+{
+  "id": "charmeleon",
+  "name": "Charmeleon",
+  "baseStats": {
+    "hp": 58,
+    "attack": 64,
+    "defense": 58,
+    "speed": 80
+  },
+  "growthRate": "medium",
+  "type": ["fire"],
+  "description": "Tem uma natureza bárbara. Em batalha, bate sua cauda ao redor e corta com garras afiadas.",
+  "rarity": "uncommon",
+  "evolvesTo": "charizard",
+  "evolutionLevel": 36
+}

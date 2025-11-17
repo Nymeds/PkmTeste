@@ -10,5 +10,7 @@
   "growthRate": "medium",
   "type": ["fire"],
   "description": "A chama em sua cauda indica sua força vital. Quando está fraco, a chama também enfraquece.",
-  "rarity": "starter"
+  "rarity": "starter",
+  "evolvesTo": "charmeleon",
+  "evolutionLevel": 16
 }

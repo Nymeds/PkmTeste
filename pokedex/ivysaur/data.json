@@ -1,0 +1,16 @@
+{
+  "id": "ivysaur",
+  "name": "Ivysaur",
+  "baseStats": {
+    "hp": 60,
+    "attack": 62,
+    "defense": 63,
+    "speed": 60
+  },
+  "growthRate": "medium",
+  "type": ["grass", "poison"],
+  "description": "Quando o botão em suas costas cresce grande, parece perder a habilidade de ficar em pé.",
+  "rarity": "uncommon",
+  "evolvesTo": "venusaur",
+  "evolutionLevel": 32
+}
