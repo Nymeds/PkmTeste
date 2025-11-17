@@ -894,7 +894,9 @@ class PetManager {
       level: opts.level ?? 1,
       xp: opts.xp ?? 0,
       rarity: entry.rarity,
-      isGif: isGif
+      isGif: isGif,
+      data: entry.data,
+      manager: this
     });
     if (opts.persistent) pet.persistent = true;
     if (typeof opts.direction === 'number') pet.direction = opts.direction;
