@@ -222,6 +222,48 @@ class Pet {
         }
       }
     }
+
+    // Checar se pode evoluir
+    if (this.persistent && this.evolvesTo && this.evolutionLevel && this.level >= this.evolutionLevel) {
+      console.log(`🌟 ${this.id} está pronto para evoluir para ${this.evolvesTo}!`);
+      this.startEvolution();
+    }
+  }
+
+  startEvolution() {
+    if (this.isEvolving || !this.evolvesTo) return;
+    
+    this.isEvolving = true;
+    this.evolutionProgress = 0;
+    console.log(`✨ Iniciando evolução de ${this.id} para ${this.evolvesTo}...`);
+  }
+
+  updateEvolution(deltaTime) {
+    if (!this.isEvolving) return;
+    
+    const evolutionSpeed = 0.5; // Progresso por segundo
+    this.evolutionProgress += evolutionSpeed * (deltaTime / 1000);
+    
+    if (this.evolutionProgress >= 1) {
+      this.completeEvolution();
+    }
+  }
+
+  completeEvolution() {
+    if (!this.evolvesTo || !this.manager) return;
+    
+    const oldSpecies = this.id;
+    const newSpecies = this.evolvesTo;
+    
+    console.log(`🎉 ${oldSpecies} evoluiu para ${newSpecies}!`);
+    
+    // Notificar o manager para trocar o Pokémon
+    if (this.manager) {
+      this.manager.evolvePokemon(this, newSpecies);
+    }
+    
+    this.isEvolving = false;
+    this.evolutionProgress = 0;
   }
 
   startCapture() {
