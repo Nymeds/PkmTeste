@@ -317,7 +317,13 @@ class Pet {
     this.captureSucceeded = false;
   }
 
-  update() {
+  update(deltaTime = 16) {
+    // Evolução em progresso
+    if (this.isEvolving) {
+      this.updateEvolution(deltaTime);
+      return; // Não faz outras ações durante evolução
+    }
+
     // Idle/Walk state management
     this.idleTimer++;
     if (this.idleTimer > this.idleDuration) {
