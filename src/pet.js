@@ -100,7 +100,7 @@ function getCaptureRate(rarity) {
 }
 
 class Pet {
-  constructor({ id, uuid, x = 0, speedBase = 1.2, spriteImg = null, stats = null, level = 1, xp = 0, rarity = 'common', isGif = false }) {
+  constructor({ id, uuid, x = 0, speedBase = 1.2, spriteImg = null, stats = null, level = 1, xp = 0, rarity = 'common', isGif = false, data = null, manager = null }) {
     this.id = id ?? `pet-${Math.floor(Math.random() * 99999)}`;
     this.uuid = uuid ?? this.id;
     this.worldX = x;
@@ -147,6 +147,14 @@ class Pet {
     this.level = level;
     this.xp = xp;
     this.xpToNextLevel = this.calculateXPToNextLevel();
+
+    // Sistema de Evolução
+    this.data = data;
+    this.manager = manager;
+    this.evolvesTo = data?.evolvesTo || null;
+    this.evolutionLevel = data?.evolutionLevel || null;
+    this.isEvolving = false;
+    this.evolutionProgress = 0;
 
     // Sistema de captura
     this.isBeingCaptured = false;
