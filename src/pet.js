@@ -808,6 +808,58 @@ class PetManager {
     ipcRenderer.send('hide-card');
   }
 
+  evolvePokemon(pet, newSpecies) {
+    console.log(`🔄 Evoluindo ${pet.id} para ${newSpecies}...`);
+    
+    // Buscar dados da evolução na pokedex
+    const evolutionEntry = this.pokedex.find(p => p.id.toLowerCase() === newSpecies.toLowerCase());
+    
+    if (!evolutionEntry) {
+      console.error(`❌ Evolução ${newSpecies} não encontrada na Pokedex!`);
+      return;
+    }
+
+    // Atualizar dados do pet
+    const oldId = pet.id;
+    pet.id = evolutionEntry.id;
+    pet.stats = evolutionEntry.stats;
+    pet.rarity = evolutionEntry.rarity;
+    pet.data = evolutionEntry.data;
+    pet.evolvesTo = evolutionEntry.data?.evolvesTo || null;
+    pet.evolutionLevel = evolutionEntry.data?.evolutionLevel || null;
+
+    // Trocar sprite
+    const oldIsGif = pet.isGif;
+    const newIsGif = evolutionEntry.imagePath && evolutionEntry.imagePath.toLowerCase().endsWith('.gif');
+    
+    // Destruir elemento GIF antigo se existir
+    if (oldIsGif && pet.gifElement) {
+      pet.destroyGifElement();
+    }
+
+    // Atualizar sprite
+    pet.sprite = evolutionEntry.imgObj || this.defaultImage;
+    pet.isGif = newIsGif;
+
+    // Criar novo elemento GIF se necessário
+    if (newIsGif) {
+      pet.createGifElement();
+    }
+
+    // Notificar main process para atualizar banco de dados
+    ipcRenderer.send('pokemon-evolved', {
+      uuid: pet.uuid,
+      oldSpecies: oldId,
+      newSpecies: pet.id,
+      level: pet.level,
+      xp: pet.xp,
+      stats: pet.stats,
+      imagePath: evolutionEntry.imagePath
+    });
+
+    console.log(`✅ ${oldId} evoluiu para ${pet.id}!`);
+  }
+
   loadPokedex(dir) {
     this.pokedex = loadPokedex(dir);
     for (const entry of this.pokedex) {
