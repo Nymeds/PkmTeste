@@ -492,6 +492,47 @@ class Pet {
       ctx.strokeText(text, barX + (barWidth - textWidth) / 2, barY - 4);
       ctx.fillText(text, barX + (barWidth - textWidth) / 2, barY - 4);
     }
+
+    // Animação de Evolução
+    if (this.isEvolving) {
+      // Efeito de brilho pulsante
+      const pulseIntensity = Math.sin(this.evolutionProgress * Math.PI * 4) * 0.5 + 0.5;
+      
+      // Círculo de luz ao redor do Pokémon
+      ctx.save();
+      ctx.globalAlpha = pulseIntensity * 0.5;
+      ctx.fillStyle = '#FFD700'; // Dourado
+      ctx.beginPath();
+      ctx.arc(screenX + this.width / 2, totalY, this.width * (0.8 + pulseIntensity * 0.3), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Partículas de luz
+      for (let i = 0; i < 8; i++) {
+        const angle = (Date.now() / 500 + i * Math.PI / 4) % (Math.PI * 2);
+        const radius = this.width * 0.8;
+        const particleX = screenX + this.width / 2 + Math.cos(angle) * radius;
+        const particleY = totalY + Math.sin(angle) * radius;
+        
+        ctx.save();
+        ctx.globalAlpha = pulseIntensity;
+        ctx.fillStyle = '#FFF';
+        ctx.beginPath();
+        ctx.arc(particleX, particleY, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Texto "Evoluindo..."
+      ctx.fillStyle = '#FFD700';
+      ctx.font = 'bold 14px Arial';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 4;
+      const evolText = 'Evoluindo...';
+      const evolTextWidth = ctx.measureText(evolText).width;
+      ctx.strokeText(evolText, screenX + (this.width - evolTextWidth) / 2, totalY - this.height);
+      ctx.fillText(evolText, screenX + (this.width - evolTextWidth) / 2, totalY - this.height);
+    }
   }
 
   isMouseOver(mouseX, mouseY, cameraX = 0) {
