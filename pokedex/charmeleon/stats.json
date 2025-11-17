@@ -1,0 +1,15 @@
+{
+  "name": "Charmeleon",
+  "type": ["Fire"],
+  "baseStats": {
+    "hp": 58,
+    "attack": 64,
+    "defense": 58,
+    "speed": 80
+  },
+  "hpGrowth": 6,
+  "attackGrowth": 5,
+  "defenseGrowth": 4,
+  "speedGrowth": 4,
+  "xpPerLevel": 120
+}

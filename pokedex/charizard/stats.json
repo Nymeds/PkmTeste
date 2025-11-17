@@ -1,0 +1,15 @@
+{
+  "name": "Charizard",
+  "type": ["Fire", "Flying"],
+  "baseStats": {
+    "hp": 78,
+    "attack": 84,
+    "defense": 78,
+    "speed": 100
+  },
+  "hpGrowth": 8,
+  "attackGrowth": 6,
+  "defenseGrowth": 5,
+  "speedGrowth": 5,
+  "xpPerLevel": 150
+}
