@@ -970,7 +970,7 @@ class PetManager {
     this.lastFrameTime = currentTime;
 
     this.pets.forEach(p => {
-      p.update();
+      p.update(deltaTime);
       if (p.isBeingCaptured) {
         p.updateCapture(deltaTime);
       }
