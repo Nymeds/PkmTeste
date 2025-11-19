@@ -924,7 +924,14 @@ class PetManager {
     const shuffled = [...this.pokedex].sort(() => Math.random() - 0.5);
     const selected = shuffled.slice(0, availableSlots);
     for (const entry of selected) {
-      this.addPetFromPokedex(entry.id, { id: entry.id, x: getRandomRange(0, Math.max(0, getWorldWidth() - 80)) });
+      // Pokémon selvagens têm níveis aleatórios entre 1 e 20
+      const randomLevel = Math.floor(getRandomRange(1, 21));
+      this.addPetFromPokedex(entry.id, { 
+        id: entry.id, 
+        x: getRandomRange(0, Math.max(0, getWorldWidth() - 80)),
+        level: randomLevel,
+        xp: 0
+      });
     }
   }
 
