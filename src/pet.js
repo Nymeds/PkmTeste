@@ -164,6 +164,44 @@ class Pet {
     this.captureShakes = 0;
     this.captureFailed = false;
     this.captureSucceeded = false;
+
+    // Sistema de Batalha
+    this.currentHP = this.calculateCurrentHP();
+    this.maxHP = this.currentHP;
+    this.isInBattle = false;
+    this.isFainted = false;
+  }
+
+  calculateCurrentHP() {
+    const baseHP = this.stats?.baseStats?.hp || 50;
+    return baseHP + (this.level * (this.stats?.hpGrowth || 5));
+  }
+
+  calculateStat(statName) {
+    const baseStat = this.stats?.baseStats?.[statName] || 50;
+    const growth = this.stats?.[`${statName}Growth`] || 3;
+    return baseStat + (this.level * growth);
+  }
+
+  takeDamage(damage) {
+    this.currentHP -= damage;
+    if (this.currentHP <= 0) {
+      this.currentHP = 0;
+      this.isFainted = true;
+    }
+    return this.currentHP;
+  }
+
+  heal(amount) {
+    this.currentHP = Math.min(this.maxHP, this.currentHP + amount);
+    if (this.currentHP > 0) {
+      this.isFainted = false;
+    }
+  }
+
+  fullHeal() {
+    this.currentHP = this.maxHP;
+    this.isFainted = false;
   }
 
   createGifElement() {
