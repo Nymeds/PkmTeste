@@ -571,6 +571,49 @@ class Pet {
       ctx.strokeText(evolText, screenX + (this.width - evolTextWidth) / 2, totalY - this.height);
       ctx.fillText(evolText, screenX + (this.width - evolTextWidth) / 2, totalY - this.height);
     }
+
+    // Indicador de Nível e HP (para Pokémon selvagens)
+    if (!this.persistent && !this.isBeingCaptured) {
+      const infoY = totalY - this.height / 2 - 25;
+      
+      // Nível
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 10px Arial';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2;
+      const levelText = `Nv.${this.level}`;
+      ctx.strokeText(levelText, screenX, infoY);
+      ctx.fillText(levelText, screenX, infoY);
+
+      // Barra de HP
+      const hpBarWidth = this.width;
+      const hpBarHeight = 4;
+      const hpBarX = screenX;
+      const hpBarY = infoY + 3;
+      
+      // Fundo
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(hpBarX, hpBarY, hpBarWidth, hpBarHeight);
+      
+      // HP atual
+      const hpPercent = this.currentHP / this.maxHP;
+      let hpColor = '#4CAF50'; // Verde
+      if (hpPercent < 0.5) hpColor = '#FF9800'; // Laranja
+      if (hpPercent < 0.25) hpColor = '#f44336'; // Vermelho
+      
+      ctx.fillStyle = hpColor;
+      ctx.fillRect(hpBarX, hpBarY, hpBarWidth * hpPercent, hpBarHeight);
+    }
+
+    // Indicador de batalha
+    if (this.isInBattle) {
+      ctx.save();
+      ctx.globalAlpha = 0.6 + Math.sin(Date.now() / 200) * 0.4;
+      ctx.strokeStyle = '#FFD700';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(screenX - 5, totalY - this.height / 2 - 5, this.width + 10, this.height + 10);
+      ctx.restore();
+    }
   }
 
   isMouseOver(mouseX, mouseY, cameraX = 0) {
