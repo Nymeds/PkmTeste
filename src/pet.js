@@ -633,6 +633,11 @@ class PetManager {
     this.capturingPet = null;
     this.lastFrameTime = Date.now();
     this.mouseOverPet = false;
+    
+    // Sistema de Batalha
+    this.activeBattle = null;
+    this.battleUI = this.createBattleUI();
+    
     this.loadPokedex(options.pokedexDir || POKEDEX_DIR);
     this.setupMouseTracking();
     this.setupClickHandler();
