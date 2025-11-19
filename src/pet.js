@@ -1189,7 +1189,12 @@ class PetManager {
       level: pet.level,
       xp: pet.xp,
       xpToNextLevel: pet.xpToNextLevel,
-      rarity: pet.rarity
+      rarity: pet.rarity,
+      currentHP: Math.ceil(pet.currentHP),
+      maxHP: Math.ceil(pet.maxHP),
+      attack: Math.ceil(pet.calculateStat('attack')),
+      defense: Math.ceil(pet.calculateStat('defense')),
+      speed: Math.ceil(pet.calculateStat('speed'))
     };
     
     ipcRenderer.send('show-card', {
@@ -1197,7 +1202,8 @@ class PetManager {
       x: Math.round(petPos.x),
       y: Math.round(petPos.y),
       persistent: pet.persistent || false,
-      capturable: !pet.persistent && !pet.isBeingCaptured
+      capturable: !pet.persistent && !pet.isBeingCaptured,
+      battleable: !pet.persistent && !pet.isInBattle
     });
   }
 
