@@ -785,6 +785,287 @@ class PetManager {
     }
   }
 
+  createBattleUI() {
+    const battleDiv = document.createElement('div');
+    battleDiv.id = 'battle-ui';
+    battleDiv.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 400px;
+      background: rgba(0, 0, 0, 0.9);
+      border: 3px solid #FFD700;
+      border-radius: 10px;
+      padding: 20px;
+      color: white;
+      font-family: Arial, sans-serif;
+      display: none;
+      z-index: 10001;
+    `;
+    
+    battleDiv.innerHTML = `
+      <div id="battle-header" style="font-size: 18px; font-weight: bold; margin-bottom: 15px; text-align: center; color: #FFD700;">
+        ⚔️ BATALHA POKÉMON ⚔️
+      </div>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+        <div>
+          <div style="font-weight: bold; color: #4CAF50;">Seu Pokémon</div>
+          <div id="player-name" style="font-size: 16px;">-</div>
+          <div style="font-size: 12px; color: #aaa;">Nv. <span id="player-level">0</span></div>
+          <div style="margin-top: 5px;">
+            <div style="background: #333; height: 20px; border-radius: 10px; overflow: hidden;">
+              <div id="player-hp-bar" style="background: linear-gradient(90deg, #4CAF50, #8BC34A); height: 100%; width: 100%; transition: width 0.3s;"></div>
+            </div>
+            <div style="font-size: 11px; margin-top: 2px;">
+              HP: <span id="player-hp">0</span>/<span id="player-max-hp">0</span>
+            </div>
+          </div>
+          <div style="font-size: 11px; margin-top: 5px; color: #ddd;">
+            ATK: <span id="player-attack">0</span> | DEF: <span id="player-defense">0</span>
+          </div>
+        </div>
+        
+        <div>
+          <div style="font-weight: bold; color: #f44336;">Pokémon Selvagem</div>
+          <div id="enemy-name" style="font-size: 16px;">-</div>
+          <div style="font-size: 12px; color: #aaa;">Nv. <span id="enemy-level">0</span></div>
+          <div style="margin-top: 5px;">
+            <div style="background: #333; height: 20px; border-radius: 10px; overflow: hidden;">
+              <div id="enemy-hp-bar" style="background: linear-gradient(90deg, #f44336, #FF9800); height: 100%; width: 100%; transition: width 0.3s;"></div>
+            </div>
+            <div style="font-size: 11px; margin-top: 2px;">
+              HP: <span id="enemy-hp">0</span>/<span id="enemy-max-hp">0</span>
+            </div>
+          </div>
+          <div style="font-size: 11px; margin-top: 5px; color: #ddd;">
+            ATK: <span id="enemy-attack">0</span> | DEF: <span id="enemy-defense">0</span>
+          </div>
+        </div>
+      </div>
+      
+      <div id="battle-log" style="background: #1a1a1a; padding: 10px; border-radius: 5px; height: 80px; overflow-y: auto; font-size: 12px; margin-bottom: 15px;">
+        <div style="color: #FFD700;">Batalha iniciada!</div>
+      </div>
+      
+      <div id="battle-actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <button id="btn-attack" style="padding: 10px; background: #f44336; border: none; border-radius: 5px; color: white; font-weight: bold; cursor: pointer; font-size: 14px;">
+          ⚔️ ATACAR
+        </button>
+        <button id="btn-run" style="padding: 10px; background: #666; border: none; border-radius: 5px; color: white; font-weight: bold; cursor: pointer; font-size: 14px;">
+          🏃 FUGIR
+        </button>
+      </div>
+    `;
+    
+    document.body.appendChild(battleDiv);
+    
+    // Adicionar event listeners
+    document.getElementById('btn-attack').addEventListener('click', () => this.battleAttack());
+    document.getElementById('btn-run').addEventListener('click', () => this.battleRun());
+    
+    return battleDiv;
+  }
+
+  startBattle(wildPokemon) {
+    // Verificar se já está em batalha ou capturando
+    if (this.activeBattle || this.capturingPet) return;
+    
+    // Pegar primeiro Pokémon do time que não está desmaiado
+    const playerPokemon = this.pets.find(p => p.persistent && !p.isFainted);
+    
+    if (!playerPokemon) {
+      this.addBattleLog('Você não tem Pokémon disponível para batalha!');
+      return;
+    }
+
+    // Criar objeto de batalha
+    this.activeBattle = {
+      playerPokemon: playerPokemon,
+      wildPokemon: wildPokemon,
+      turn: 'player',
+      isProcessing: false
+    };
+
+    // Marcar Pokémon como em batalha
+    playerPokemon.isInBattle = true;
+    wildPokemon.isInBattle = true;
+
+    // Mostrar UI
+    this.battleUI.style.display = 'block';
+    this.updateBattleUI();
+    this.addBattleLog(`Batalha contra ${wildPokemon.id} selvagem (Nv. ${wildPokemon.level})!`);
+
+    console.log(`⚔️ Batalha iniciada: ${playerPokemon.id} vs ${wildPokemon.id}`);
+  }
+
+  updateBattleUI() {
+    if (!this.activeBattle) return;
+
+    const { playerPokemon, wildPokemon } = this.activeBattle;
+
+    // Player
+    document.getElementById('player-name').textContent = playerPokemon.id;
+    document.getElementById('player-level').textContent = playerPokemon.level;
+    document.getElementById('player-hp').textContent = Math.ceil(playerPokemon.currentHP);
+    document.getElementById('player-max-hp').textContent = Math.ceil(playerPokemon.maxHP);
+    document.getElementById('player-attack').textContent = Math.ceil(playerPokemon.calculateStat('attack'));
+    document.getElementById('player-defense').textContent = Math.ceil(playerPokemon.calculateStat('defense'));
+    
+    const playerHPPercent = (playerPokemon.currentHP / playerPokemon.maxHP) * 100;
+    document.getElementById('player-hp-bar').style.width = playerHPPercent + '%';
+
+    // Enemy
+    document.getElementById('enemy-name').textContent = wildPokemon.id;
+    document.getElementById('enemy-level').textContent = wildPokemon.level;
+    document.getElementById('enemy-hp').textContent = Math.ceil(wildPokemon.currentHP);
+    document.getElementById('enemy-max-hp').textContent = Math.ceil(wildPokemon.maxHP);
+    document.getElementById('enemy-attack').textContent = Math.ceil(wildPokemon.calculateStat('attack'));
+    document.getElementById('enemy-defense').textContent = Math.ceil(wildPokemon.calculateStat('defense'));
+    
+    const enemyHPPercent = (wildPokemon.currentHP / wildPokemon.maxHP) * 100;
+    document.getElementById('enemy-hp-bar').style.width = enemyHPPercent + '%';
+  }
+
+  addBattleLog(message) {
+    const log = document.getElementById('battle-log');
+    const entry = document.createElement('div');
+    entry.textContent = `> ${message}`;
+    entry.style.marginBottom = '3px';
+    log.appendChild(entry);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  battleAttack() {
+    if (!this.activeBattle || this.activeBattle.isProcessing) return;
+    
+    this.activeBattle.isProcessing = true;
+    const { playerPokemon, wildPokemon } = this.activeBattle;
+
+    // Calcular dano do jogador
+    const playerAttack = playerPokemon.calculateStat('attack');
+    const enemyDefense = wildPokemon.calculateStat('defense');
+    const playerDamage = Math.max(5, Math.floor((playerAttack * 2) / enemyDefense) + getRandomRange(-3, 3));
+
+    wildPokemon.takeDamage(playerDamage);
+    this.addBattleLog(`${playerPokemon.id} atacou! ${playerDamage} de dano!`);
+    this.updateBattleUI();
+
+    // Verificar se inimigo foi derrotado
+    if (wildPokemon.isFainted) {
+      setTimeout(() => {
+        this.battleVictory();
+      }, 800);
+      return;
+    }
+
+    // Turno do inimigo
+    setTimeout(() => {
+      const enemyAttack = wildPokemon.calculateStat('attack');
+      const playerDefense = playerPokemon.calculateStat('defense');
+      const enemyDamage = Math.max(5, Math.floor((enemyAttack * 2) / playerDefense) + getRandomRange(-3, 3));
+
+      playerPokemon.takeDamage(enemyDamage);
+      this.addBattleLog(`${wildPokemon.id} atacou! ${enemyDamage} de dano!`);
+      this.updateBattleUI();
+
+      // Verificar se jogador foi derrotado
+      if (playerPokemon.isFainted) {
+        setTimeout(() => {
+          this.battleDefeat();
+        }, 800);
+      } else {
+        this.activeBattle.isProcessing = false;
+      }
+    }, 1000);
+  }
+
+  battleRun() {
+    if (!this.activeBattle) return;
+    
+    const runChance = Math.random();
+    if (runChance > 0.5) {
+      this.addBattleLog('Você fugiu da batalha!');
+      setTimeout(() => {
+        this.endBattle();
+      }, 1000);
+    } else {
+      this.addBattleLog('Não conseguiu fugir!');
+      
+      // Inimigo ataca
+      setTimeout(() => {
+        const { playerPokemon, wildPokemon } = this.activeBattle;
+        const enemyAttack = wildPokemon.calculateStat('attack');
+        const playerDefense = playerPokemon.calculateStat('defense');
+        const enemyDamage = Math.max(5, Math.floor((enemyAttack * 2) / playerDefense) + getRandomRange(-3, 3));
+
+        playerPokemon.takeDamage(enemyDamage);
+        this.addBattleLog(`${wildPokemon.id} atacou! ${enemyDamage} de dano!`);
+        this.updateBattleUI();
+
+        if (playerPokemon.isFainted) {
+          setTimeout(() => {
+            this.battleDefeat();
+          }, 800);
+        }
+      }, 1000);
+    }
+  }
+
+  battleVictory() {
+    const { playerPokemon, wildPokemon } = this.activeBattle;
+    
+    // Calcular XP ganho
+    const xpGained = Math.floor(wildPokemon.level * 10 * (1 + Math.random() * 0.5));
+    
+    this.addBattleLog(`${wildPokemon.id} foi derrotado!`);
+    this.addBattleLog(`${playerPokemon.id} ganhou ${xpGained} XP!`);
+    
+    playerPokemon.gainXP(xpGained);
+
+    // Remover Pokémon selvagem da tela
+    setTimeout(() => {
+      const index = this.pets.indexOf(wildPokemon);
+      if (index > -1) {
+        if (wildPokemon.gifElement) {
+          wildPokemon.destroyGifElement();
+        }
+        this.pets.splice(index, 1);
+      }
+      
+      this.endBattle();
+    }, 2000);
+  }
+
+  battleDefeat() {
+    const { playerPokemon } = this.activeBattle;
+    
+    this.addBattleLog(`${playerPokemon.id} desmaiou!`);
+    this.addBattleLog('Você perdeu a batalha...');
+    
+    setTimeout(() => {
+      // Curar Pokémon após derrota
+      playerPokemon.fullHeal();
+      this.endBattle();
+    }, 2000);
+  }
+
+  endBattle() {
+    if (!this.activeBattle) return;
+
+    // Limpar estado de batalha
+    this.activeBattle.playerPokemon.isInBattle = false;
+    if (!this.activeBattle.wildPokemon.isFainted) {
+      this.activeBattle.wildPokemon.isInBattle = false;
+    }
+
+    this.activeBattle = null;
+    this.battleUI.style.display = 'none';
+    
+    // Limpar log
+    document.getElementById('battle-log').innerHTML = '<div style="color: #FFD700;">Batalha iniciada!</div>';
+  }
+
   setupMouseTracking() {
     // Usar mousemove global para detectar quando o mouse está sobre um Pokémon
     document.addEventListener('mousemove', (e) => {
