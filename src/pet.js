@@ -710,39 +710,21 @@ class PetManager {
   }
 
   setupClickHandler() {
-    // Clique esquerdo: capturar
+    // Clique em Pokémon selvagem: mostrar menu
     document.addEventListener('click', (e) => {
-      if (e.button !== 0) return; // Apenas botão esquerdo
-
       const mouseX = e.clientX;
       const mouseY = e.clientY;
 
       // Verificar se clicou em algum Pokémon selvagem
       for (const pet of this.pets) {
-        if (!pet.persistent && pet.isMouseOver(mouseX, mouseY, this.cameraX)) {
-          this.startCapture(pet);
+        if (!pet.persistent && !pet.isInBattle && pet.isMouseOver(mouseX, mouseY, this.cameraX)) {
+          this.showActionMenu(pet, mouseX, mouseY);
           break;
         }
       }
     });
 
-    // Clique direito: batalhar
-    document.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      
-      const mouseX = e.clientX;
-      const mouseY = e.clientY;
-
-      // Verificar se clicou em algum Pokémon selvagem
-      for (const pet of this.pets) {
-        if (!pet.persistent && pet.isMouseOver(mouseX, mouseY, this.cameraX)) {
-          this.startBattle(pet);
-          break;
-        }
-      }
-    });
-
-    // Cancelar captura ao pressionar ESC
+    // Cancelar ao pressionar ESC
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         if (this.capturingPet) {
@@ -751,6 +733,7 @@ class PetManager {
         if (this.activeBattle) {
           this.endBattle();
         }
+        this.hideActionMenu();
       }
     });
   }
