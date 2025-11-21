@@ -27,6 +27,82 @@ function getWorldWidth() {
 
 function getRandomRange(min, max) { return Math.random() * (max - min) + min; }
 
+// Classe de Projétil para batalhas visuais
+class Projectile {
+  constructor(startX, startY, targetX, targetY, type = 'grass') {
+    this.x = startX;
+    this.y = startY;
+    this.targetX = targetX;
+    this.targetY = targetY;
+    this.type = type;
+    this.speed = 5;
+    this.active = true;
+    
+    // Calcular direção
+    const dx = targetX - startX;
+    const dy = targetY - startY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    this.vx = (dx / distance) * this.speed;
+    this.vy = (dy / distance) * this.speed;
+    
+    // Propriedades visuais baseadas no tipo
+    this.setupVisuals();
+  }
+  
+  setupVisuals() {
+    const visuals = {
+      grass: { color: '#4CAF50', particle: '🍃', size: 8 },
+      fire: { color: '#FF5722', particle: '🔥', size: 10 },
+      water: { color: '#2196F3', particle: '💧', size: 8 },
+      normal: { color: '#9E9E9E', particle: '⭐', size: 6 },
+      poison: { color: '#9C27B0', particle: '☠️', size: 8 }
+    };
+    
+    this.visual = visuals[this.type] || visuals.normal;
+  }
+  
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    
+    // Verificar se chegou perto do alvo
+    const dx = this.targetX - this.x;
+    const dy = this.targetY - this.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    if (distance < 10) {
+      this.active = false;
+    }
+  }
+  
+  draw(ctx) {
+    if (!this.active) return;
+    
+    ctx.save();
+    
+    // Desenhar rastro
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = this.visual.color;
+    ctx.beginPath();
+    ctx.arc(this.x - this.vx * 2, this.y - this.vy * 2, this.visual.size * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Desenhar projétil principal
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = this.visual.color;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.visual.size, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Borda brilhante
+    ctx.strokeStyle = '#FFF';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    ctx.restore();
+  }
+}
+
 function loadPokedex(dir = POKEDEX_DIR) {
   const result = [];
   try {
