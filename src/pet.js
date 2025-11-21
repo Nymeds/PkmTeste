@@ -1108,6 +1108,135 @@ class PetManager {
     // Limpar log
     document.getElementById('battle-log').innerHTML = '<div style="color: #FFD700;">Batalha iniciada!</div>';
   }
+  startVisualBattle(wildPokemon) {
+    // Verificar se já está em batalha ou capturando
+    if (this.activeBattle || this.capturingPet) return;
+    
+    // Pegar primeiro Pokémon do time que não está desmaiado
+    const playerPokemon = this.pets.find(p => p.persistent && !p.isFainted);
+    
+    if (!playerPokemon) {
+      console.log('Você não tem Pokémon disponível para batalha!');
+      return;
+    }
+
+    // Criar objeto de batalha visual simples
+    this.activeBattle = {
+      playerPokemon: playerPokemon,
+      wildPokemon: wildPokemon,
+      turn: 'player',
+      isProcessing: false,
+      isVisual: true
+    };
+
+    // Marcar Pokémon como em batalha
+    playerPokemon.isInBattle = true;
+    wildPokemon.isInBattle = true;
+
+    console.log(`⚔️ Batalha visual iniciada: ${playerPokemon.id} vs ${wildPokemon.id}`);
+    
+    // Iniciar batalha automática visual
+    this.processVisualBattle();
+  }
+
+  processVisualBattle() {
+    if (!this.activeBattle || !this.activeBattle.isVisual) return;
+
+    const { playerPokemon, wildPokemon } = this.activeBattle;
+    
+    // Batalha automática com turnos rápidos
+    const battleTurn = () => {
+      if (!this.activeBattle) return;
+
+      // Turno do jogador
+      const playerAttack = playerPokemon.calculateStat('attack');
+      const enemyDefense = wildPokemon.calculateStat('defense');
+      const playerDamage = Math.max(5, Math.floor((playerAttack * 2) / enemyDefense) + getRandomRange(-3, 3));
+
+      wildPokemon.takeDamage(playerDamage);
+      console.log(`${playerPokemon.id} atacou! ${playerDamage} de dano!`);
+
+      // Verificar se inimigo foi derrotado
+      if (wildPokemon.isFainted) {
+        this.visualBattleVictory();
+        return;
+      }
+
+      // Turno do inimigo após 1 segundo
+      setTimeout(() => {
+        if (!this.activeBattle) return;
+
+        const enemyAttack = wildPokemon.calculateStat('attack');
+        const playerDefense = playerPokemon.calculateStat('defense');
+        const enemyDamage = Math.max(5, Math.floor((enemyAttack * 2) / playerDefense) + getRandomRange(-3, 3));
+
+        playerPokemon.takeDamage(enemyDamage);
+        console.log(`${wildPokemon.id} atacou! ${enemyDamage} de dano!`);
+
+        // Verificar se jogador foi derrotado
+        if (playerPokemon.isFainted) {
+          this.visualBattleDefeat();
+          return;
+        }
+
+        // Próximo turno após 1.5 segundos
+        setTimeout(battleTurn, 1500);
+      }, 1000);
+    };
+
+    // Iniciar primeiro turno
+    battleTurn();
+  }
+
+  visualBattleVictory() {
+    const { playerPokemon, wildPokemon } = this.activeBattle;
+    
+    // Calcular XP ganho
+    const xpGained = Math.floor(wildPokemon.level * 10 * (1 + Math.random() * 0.5));
+    
+    console.log(`${wildPokemon.id} foi derrotado!`);
+    console.log(`${playerPokemon.id} ganhou ${xpGained} XP!`);
+    
+    playerPokemon.gainXP(xpGained);
+
+    // Remover Pokémon selvagem da tela
+    setTimeout(() => {
+      const index = this.pets.indexOf(wildPokemon);
+      if (index > -1) {
+        if (wildPokemon.gifElement) {
+          wildPokemon.destroyGifElement();
+        }
+        this.pets.splice(index, 1);
+      }
+      
+      this.endVisualBattle();
+    }, 2000);
+  }
+
+  visualBattleDefeat() {
+    const { playerPokemon } = this.activeBattle;
+    
+    console.log(`${playerPokemon.id} desmaiou!`);
+    console.log('Você perdeu a batalha...');
+    
+    setTimeout(() => {
+      // Curar Pokémon após derrota
+      playerPokemon.fullHeal();
+      this.endVisualBattle();
+    }, 2000);
+  }
+
+  endVisualBattle() {
+    if (!this.activeBattle) return;
+
+    // Limpar estado de batalha
+    this.activeBattle.playerPokemon.isInBattle = false;
+    if (!this.activeBattle.wildPokemon.isFainted) {
+      this.activeBattle.wildPokemon.isInBattle = false;
+    }
+
+    this.activeBattle = null;
+  }
 
   setupMouseTracking() {
     // Usar mousemove global para detectar quando o mouse está sobre um Pokémon
