@@ -756,6 +756,7 @@ class PetManager {
     // Sistema de Batalha
     this.activeBattle = null;
     this.battleUI = this.createBattleUI();
+    this.projectiles = [];
     
     this.loadPokedex(options.pokedexDir || POKEDEX_DIR);
     this.setupMouseTracking();
