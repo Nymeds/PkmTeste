@@ -710,15 +710,33 @@ class PetManager {
   }
 
   setupClickHandler() {
-    // Clique em Pokémon selvagem: mostrar menu
+    // Clique esquerdo: capturar
     document.addEventListener('click', (e) => {
+      if (e.button !== 0) return; // Apenas botão esquerdo
+
       const mouseX = e.clientX;
       const mouseY = e.clientY;
 
       // Verificar se clicou em algum Pokémon selvagem
       for (const pet of this.pets) {
         if (!pet.persistent && !pet.isInBattle && pet.isMouseOver(mouseX, mouseY, this.cameraX)) {
-          this.showActionMenu(pet, mouseX, mouseY);
+          this.startCapture(pet);
+          break;
+        }
+      }
+    });
+
+    // Clique direito: batalhar
+    document.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      
+      const mouseX = e.clientX;
+      const mouseY = e.clientY;
+
+      // Verificar se clicou em algum Pokémon selvagem
+      for (const pet of this.pets) {
+        if (!pet.persistent && !pet.isInBattle && pet.isMouseOver(mouseX, mouseY, this.cameraX)) {
+          this.startVisualBattle(pet);
           break;
         }
       }
@@ -733,7 +751,6 @@ class PetManager {
         if (this.activeBattle) {
           this.endBattle();
         }
-        this.hideActionMenu();
       }
     });
   }
